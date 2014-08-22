@@ -1,0 +1,17 @@
+Package: saps
+Title: Significance Analysis of Prognostic Signatures
+Description: What the package does
+Version: 0.1
+Author: Daniel Schmolze <saps@schmolze.com>
+Maintainer: Daniel Schmolze <saps@schmolze.com>
+Depends:
+    R (>= 2.14.0),
+    piano,
+    survcomp,
+    reshape2
+Suggests:
+    snowfall,
+    knitr
+License: BSD
+LazyData: true
+VignetteBuilder: knitr
