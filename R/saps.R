@@ -41,12 +41,14 @@ NULL
 #' computation. Defaults to \code{TRUE}.
 #' @return The function returns a matrix with the following columns:
 #'
-#' \code{Size P_pure  P_random  P_enrichment  direction}
+#' \code{Size P_pure  P_random  P_enrichment  direction saps_score}
 #'
 #' Each row represents a gene set, and the row names contain the gene set names.
 #' \code{Size} is the size of the gene set. \code{P_pure}, \code{P_random}, and
 #' \code{P_enrichment} are the respective SAPS statistics for the gene set, while
 #' \code{direction} is the direction of association for the enrichment score.
+#' saps_score is -log10 max(P_pure, P_random, P_enrichment) multiplied by
+#' \code{direction}.
 #' @references Beck AH, Knoblauch NW, Hefti MM, Kaplan J, Schnitt SJ, et al.
 #' (2013) Significance Analysis of Prognostic Signatures. PLoS Comput Biol 9(1):
 #' e1002875.doi:10.1371/journal.pcbi.1002875

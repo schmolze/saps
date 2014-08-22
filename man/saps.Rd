@@ -40,12 +40,14 @@ computation. Defaults to \code{TRUE}.}
 \value{
 The function returns a matrix with the following columns:
 
-\code{Size P_pure  P_random  P_enrichment  direction}
+\code{Size P_pure  P_random  P_enrichment  direction saps_score}
 
 Each row represents a gene set, and the row names contain the gene set names.
 \code{Size} is the size of the gene set. \code{P_pure}, \code{P_random}, and
 \code{P_enrichment} are the respective SAPS statistics for the gene set, while
 \code{direction} is the direction of association for the enrichment score.
+saps_score is -log10 max(P_pure, P_random, P_enrichment) multiplied by
+\code{direction}.
 }
 \description{
 This is the main user interface to the \pkg{saps} package, and is
