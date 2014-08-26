@@ -28,9 +28,9 @@ NULL
 #' rows (i.e. patients) in \code{dataSet}. This parameter is used by
 #' \code{\link[survcomp]{concordance.index}} to compute the concordance index, which
 #' is in turn used by \code{\link{calculatePEnrichment}} to compute P_enrichment.
-#' @param events A vector of events. The length must equal the number of rows
-#' (i.e. patients) in \code{dataSet}. This parameter is used by
-#' \code{\link[survcomp]{concordance.index}} to compute the concordance index, which
+#' @param followup A vector of 0 or 1 values, indicating whether the patient was
+#' lost to followup (0) or not (1). The length must equal the number of rows
+#' (i.e. patients) in \code{dataSet}.
 #' is in turn used by \code{\link{calculatePEnrichment}} to compute P_enrichment.
 #' @param random.samples An integer that specifies how many random gene sets to sample
 #' when computing P_random. Used by \code{\link{calculatePRandom}}.
@@ -52,7 +52,7 @@ NULL
 #' @references Beck AH, Knoblauch NW, Hefti MM, Kaplan J, Schnitt SJ, et al.
 #' (2013) Significance Analysis of Prognostic Signatures. PLoS Comput Biol 9(1):
 #' e1002875.doi:10.1371/journal.pcbi.1002875
-saps <- function(candidateGeneSets, dataSet, survivalTimes, events, random.samples=25, cpus=1, verbose=TRUE) {
+saps <- function(candidateGeneSets, dataSet, survivalTimes, followup, random.samples=25, cpus=1, verbose=TRUE) {
 
   if ((cpus > 1) & (!is.installed("snowfall")))
     stop("'snowfall' package not found (required for multiple CPU support)")
@@ -71,7 +71,7 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes, events, random.sampl
     for (i in 1:candidateSetCount) {
 
       set_results <- sapsSingleSet(candidateGeneSets[i,,drop=FALSE], dataSet,
-                                   survivalTimes, events,
+                                   survivalTimes, followup,
                                    random.samples, cpus, verbose)
 
       results <- rbind(results, set_results)
@@ -83,7 +83,7 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes, events, random.sampl
   # only one candidate set
   else {
 
-    results <- sapsSingleSet(candidateGeneSets, dataSet, survivalTimes, events,
+    results <- sapsSingleSet(candidateGeneSets, dataSet, survivalTimes, followup,
                          random.samples, cpus, verbose)
 
   }
@@ -96,7 +96,7 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes, events, random.sampl
 }
 
 
-sapsSingleSet <- function(candidateGeneSet, dataSet, survivalTimes, events, random.samples=25, cpus=1, verbose=TRUE) {
+sapsSingleSet <- function(candidateGeneSet, dataSet, survivalTimes, followup, random.samples=25, cpus=1, verbose=TRUE) {
 
   candidateSetName <- row.names(candidateGeneSet)
 
@@ -135,7 +135,7 @@ sapsSingleSet <- function(candidateGeneSet, dataSet, survivalTimes, events, rand
     if (verbose)
       message("Calculating P_pure...", appendLF=FALSE)
 
-    p_pure <- calculatePPure(scaledData, survivalTimes, events)
+    p_pure <- calculatePPure(scaledData, survivalTimes, followup)
     results[1, "P_pure"] <- p_pure
 
     if (verbose)
@@ -145,7 +145,7 @@ sapsSingleSet <- function(candidateGeneSet, dataSet, survivalTimes, events, rand
       message("Calculating P_random...", appendLF=FALSE)
 
     results[1, "P_random"] <- calculatePRandom(dataSet, candidateSetSize, p_pure,
-                                               survivalTimes, events, random.samples)
+                                               survivalTimes, followup, random.samples)
     if (verbose)
       message("done.")
 
@@ -155,7 +155,7 @@ sapsSingleSet <- function(candidateGeneSet, dataSet, survivalTimes, events, rand
     # get concordance index (only needs to be done once)
     if (!exists("ci")) {
 
-      ci <- rankConcordance(dataSet, survivalTimes, events)
+      ci <- rankConcordance(dataSet, survivalTimes, followup)
 
       rankedGenes <- ci[, -1]
 
@@ -277,21 +277,22 @@ calculatePEnrichment <- function(rankedGenes, candidateGeneSet, cpus) {
 #' and \emph{p} genes in the candidate prognostic set.
 #' @param survivalTimes A vector of survival times. The length must equal
 #' the number of rows \emph{n} in \code{geneData}.
-#' @param events A vector of events. The length must equal the number of
-#' rows \emph{n} in \code{geneData}.
+#' @param followup A vector of 0 or 1 values, indicating whether the patient was
+#' lost to followup (0) or not (1). The length must equal the number of rows
+#' (i.e. patients) in \code{geneData}.
 #' @return A log-rank p-value indicating the probability that the two groups
 #' show no survival difference.
 #' @seealso \code{\link{saps}}
 #' @references Beck AH, Knoblauch NW, Hefti MM, Kaplan J, Schnitt SJ, et al.
 #' (2013) Significance Analysis of Prognostic Signatures. PLoS Comput Biol 9(1):
 #' e1002875.doi:10.1371/journal.pcbi.1002875
-calculatePPure <- function(geneData, survivalTimes, events) {
+calculatePPure <- function(geneData, survivalTimes, followup) {
 
   # cluster the patients on the candidate genes
   cluster <- kmeans(geneData, 2)$cluster
 
   # compute probability of no survival difference
-  survtest <- survdiff(Surv(survivalTimes, events) ~ cluster)
+  survtest <- survdiff(Surv(survivalTimes, followup) ~ cluster)
 
   return (1 - pchisq(survtest$chisq, 1))
 
@@ -313,8 +314,9 @@ calculatePPure <- function(geneData, survivalTimes, events) {
 #' values for the randomly generated gene sets.
 #' @param survivalTimes A vector of survival times. The length must equal
 #' the number of rows in \code{dataSet}.
-#' @param events A vector of events. The length must equal the number of
-#' rows in \code{dataSet}.
+#' @param followup A vector of 0 or 1 values, indicating whether the patient was
+#' lost to followup (0) or not (1). The length must equal the number of rows
+#' (i.e. patients) in \code{dataSet}.
 #' @param random.samples The number of random gene sets to sample.
 #' @return The proportion of randomly sampled gene sets with a calculated
 #' P_pure at least as significant as the provided \code{p_pure}.
@@ -322,7 +324,7 @@ calculatePPure <- function(geneData, survivalTimes, events) {
 #' @references Beck AH, Knoblauch NW, Hefti MM, Kaplan J, Schnitt SJ, et al.
 #' (2013) Significance Analysis of Prognostic Signatures. PLoS Comput Biol 9(1):
 #' e1002875.doi:10.1371/journal.pcbi.1002875
-calculatePRandom <- function(dataSet, sampleSize, p_pure, survivalTimes, events, random.samples=25) {
+calculatePRandom <- function(dataSet, sampleSize, p_pure, survivalTimes, followup, random.samples=25) {
 
   geneNames = colnames(dataSet)
 
@@ -338,7 +340,7 @@ calculatePRandom <- function(dataSet, sampleSize, p_pure, survivalTimes, events,
 
     randomGeneSet <- scale(dataSet[, randomGeneNames])
 
-    p_pures[i] <- calculatePPure(randomGeneSet, survivalTimes, events)
+    p_pures[i] <- calculatePPure(randomGeneSet, survivalTimes, followup)
 
   }
 
@@ -360,8 +362,9 @@ calculatePRandom <- function(dataSet, sampleSize, p_pure, survivalTimes, events,
 #' a single patient.
 #' @param survivalTimes A vector of survival times. The length must equal the number of
 #' rows (i.e. patients) in \code{dataset}.
-#' @param events A vector of events. The length must equal the number of rows
-#' (i.e. patients) in \code{dataset}.
+#' @param followup A vector of 0 or 1 values, indicating whether the patient was
+#' lost to followup (0) or not (1). The length must equal the number of rows
+#' (i.e. patients) in \code{dataSet}.
 #' @return The function returns a matrix with two columns:
 #'
 #' \code{cindex  z}
@@ -370,11 +373,11 @@ calculatePRandom <- function(dataSet, sampleSize, p_pure, survivalTimes, events,
 #' are the concordance index and corresponding z-score. The
 #' row names contain the gene identifiers.
 #' @seealso \code{\link{saps}} \code{\link[survcomp]{concordance.index}}
-rankConcordance <- function(dataset, survivalTimes, events) {
+rankConcordance <- function(dataset, survivalTimes, followup) {
 
   concordance_f <- function(x) {
 
-    tt <- concordance.index(x, surv.time=survivalTimes, surv.event=events, method="noether", na.rm=TRUE)
+    tt <- concordance.index(x, surv.time=survivalTimes, surv.event=followup, method="noether", na.rm=TRUE)
     return (c("cindex"=tt$c.index, "z"=(tt$c.index - 0.5)/tt$se))
 
   }
