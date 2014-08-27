@@ -52,7 +52,8 @@ NULL
 #' @references Beck AH, Knoblauch NW, Hefti MM, Kaplan J, Schnitt SJ, et al.
 #' (2013) Significance Analysis of Prognostic Signatures. PLoS Comput Biol 9(1):
 #' e1002875.doi:10.1371/journal.pcbi.1002875
-saps <- function(candidateGeneSets, dataSet, survivalTimes, followup, random.samples=25, cpus=1, verbose=TRUE) {
+saps <- function(candidateGeneSets, dataSet, survivalTimes,
+                 followup, random.samples=25, cpus=1, verbose=TRUE) {
 
   if ((cpus > 1) & (!is.installed("snowfall")))
     stop("'snowfall' package not found (required for multiple CPU support)")
@@ -79,15 +80,100 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes, followup, random.sam
 
 
   setNames = rownames(candidateGeneSets)
+  geneNames <- colnames(dataSet)
 
+  # compute saps statistics for each candidate gene set
   for (i in 1:candidateSetCount) {
 
     candidateGeneSet <- candidateGeneSets[i,,drop=FALSE]
+
+    candidateSetName <- row.names(candidateGeneSet)
+
     setName <- setNames[i]
 
-    set_results <- sapsSingleSet(rankedGenes, candidateGeneSet,
-                                   dataSet, survivalTimes, followup,
-                                   random.samples, cpus, verbose)
+    # get candidate genes
+    candidateGenes <- as.character(candidateGeneSet[!is.na(candidateGeneSet)])
+    commonGenes <- intersect(geneNames, candidateGenes)
+
+    candidateSetSize = length(commonGenes)
+
+    # prepare results for this geneset
+    set_results <- list("size" = candidateSetSize,
+                    "saps_unadjusted" = vector(mode="numeric", length=3),
+                    "saps_adjusted" = vector(mode="numeric", length=3),
+                    "random_p_pures" = NA,
+                    "direction" = NA,
+                    "saps_score" = NA,
+                    "saps_score_adj" = NA)
+
+    names(set_results$saps_unadjusted) <- c("p_pure", "p_random", "p_enrich")
+    names(set_results$saps_adjusted) <- c("p_pure", "p_random", "p_enrich")
+
+    if(candidateSetSize == 0) {
+
+      warning(c("No gene data found for gene set ", candidateSetName, ", cannot compute SAPS."))
+
+    }
+    else {
+
+      if (verbose)
+        message(c("Using gene set ", candidateSetName, ", size = ", candidateSetSize))
+
+      set_results$size <- candidateSetSize
+
+      scaledData <- scale(dataSet[,is.element(geneNames, commonGenes)])
+
+      if (verbose)
+        message("Calculating P_pure...", appendLF=FALSE)
+
+      p_pure <- calculatePPure(scaledData, survivalTimes, followup)
+      set_results$saps_unadjusted["p_pure"] <- p_pure
+
+      if (verbose)
+        message("done.")
+
+      if (verbose)
+        message("Calculating P_random...", appendLF=FALSE)
+
+      p_random <- calculatePRandom(dataSet, candidateSetSize, p_pure, survivalTimes,
+                                   followup, random.samples)
+
+      set_results$saps_unadjusted["p_random"] <- p_random
+
+      if (verbose)
+        message("done.")
+
+      if (verbose)
+        message("Calculating P_enrichment...", appendLF=FALSE)
+
+      gsa_results <- calculatePEnrichment(rankedGenes, candidateGeneSet, cpus)
+
+      p_enrich <- gsa_results$P_enrichment
+      direction <- gsa_results$direction
+
+      set_results$saps_unadjusted["p_enrich"] <- p_enrich
+      set_results["direction"] <- direction
+
+      # calculate adjusted p-values
+      set_results$saps_adjusted["p_pure"] <- p.adjust(p_pure, method="BH",
+                                                      n=candidateSetCount)
+      set_results$saps_adjusted["p_random"] <- p.adjust(p_random, method="BH",
+                                                      n=candidateSetCount)
+      set_results$saps_adjusted["p_enrich"] <- p.adjust(p_enrich, method="BH",
+                                                      n=candidateSetCount)
+
+      # calculate saps score, adjusted and unadjusted
+      p_max <- max(p_pure, p_random, p_enrich)
+      saps_score <- -log10(p_max) * direction
+      saps_score_adj <- p.adjust(saps_score, method="BH", n=candidateSetCount)
+
+      set_results["saps_score"] <- saps_score
+      set_results["saps_score_adj"] <- saps_score_adj
+
+      if (verbose)
+        message("done.")
+
+    }
 
     results$genesets[[setName]] <- set_results
 
@@ -97,93 +183,6 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes, followup, random.sam
   #results["saps_score"] <- apply(results, 1, calculateSAPSScore)
 
   return(results)
-
-}
-
-
-sapsSingleSet <- function(rankedGenes, candidateGeneSet, dataSet, survivalTimes,
-                          followup, random.samples=25, cpus=1, verbose=TRUE) {
-
-  candidateSetName <- row.names(candidateGeneSet)
-
-  geneNames <- colnames(dataSet)
-
-  # get candidate genes
-  candidateGenes <- as.character(candidateGeneSet[!is.na(candidateGeneSet)])
-  commonGenes <- intersect(geneNames, candidateGenes)
-
-  candidateSetSize = length(commonGenes)
-
-  # prepare results list
-  results <- list("size" = candidateSetSize,
-                  "saps_unadjusted" = vector(mode="numeric", length=3),
-                  "saps_adjusted" = vector(mode="numeric", length=3),
-                  "random_p_pures" = NA,
-                  "direction" = NA,
-                  "saps_score" = NA,
-                  "saps_score_adj" = NA)
-
-  names(results$saps_unadjusted) <- c("p_pure", "p_random", "p_enrich")
-  names(results$saps_adjusted) <- c("p_pure", "p_random", "p_enrich")
-
-  if(candidateSetSize == 0) {
-
-    warning(c("No gene data found for gene set ", candidateSetName, ", cannot compute SAPS."))
-
-  }
-  else {
-
-    if (verbose)
-      message(c("Using gene set ", candidateSetName, ", size = ", candidateSetSize))
-
-    results$size <- candidateSetSize
-
-    scaledData <- scale(dataSet[,is.element(geneNames, commonGenes)])
-
-    if (verbose)
-      message("Calculating P_pure...", appendLF=FALSE)
-
-    p_pure <- calculatePPure(scaledData, survivalTimes, followup)
-    results$saps_unadjusted["p_pure"] <- p_pure
-
-    if (verbose)
-      message("done.")
-
-    if (verbose)
-      message("Calculating P_random...", appendLF=FALSE)
-
-    results$saps_unadjusted["p_random"] <- calculatePRandom(dataSet, candidateSetSize, p_pure,
-                                               survivalTimes, followup, random.samples)
-    if (verbose)
-      message("done.")
-
-    if (verbose)
-      message("Calculating P_enrichment...", appendLF=FALSE)
-
-    gsa_results <- calculatePEnrichment(rankedGenes, candidateGeneSet, cpus)
-
-    results$saps_unadjusted["p_enrich"] <- gsa_results$P_enrichment
-    results["direction"] <- gsa_results$direction
-
-    if (verbose)
-      message("done.")
-
-  }
-
-  return(results)
-}
-
-
-calculateSAPSScore <- function(pvals) {
-
-  p_pure <- pvals[2]
-  p_rand <- pvals[3]
-  p_enrich <- pvals[4]
-  dir <- pvals[5]
-
-  p_max <- max(p_pure, p_rand, p_enrich)
-
-  return(-log10(p_max) * dir)
 
 }
 
