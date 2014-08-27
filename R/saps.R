@@ -59,6 +59,10 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes, followup, random.sam
 
   candidateSetCount <- nrow(candidateGeneSets)
 
+  # prepare results
+  results <- list("rankedGenes"=NA, "geneset.count"=candidateSetCount,
+                  "genesets"=list())
+
   # get concordance index
 
   if (verbose)
@@ -68,40 +72,29 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes, followup, random.sam
 
   rankedGenes <- ci[, -1]
 
+  results$rankedGenes <- rankedGenes
+
   if (verbose)
     message("done.")
 
-  results <- matrix(NA, nrow=0, ncol=5,
-                    dimnames=list(NULL, c("Size","P_pure","P_random",
-                                          "P_enrichment", "direction")))
 
-  # extra steps are needed for multiple candidate gene sets
-  if (candidateSetCount > 1) {
+  setNames = rownames(candidateGeneSets)
 
-    setNames = rownames(candidateGeneSets)
+  for (i in 1:candidateSetCount) {
 
-    for (i in 1:candidateSetCount) {
+    candidateGeneSet <- candidateGeneSets[i,,drop=FALSE]
+    setName <- setNames[i]
 
-      set_results <- sapsSingleSet(rankedGenes, candidateGeneSets[i,,drop=FALSE],
+    set_results <- sapsSingleSet(rankedGenes, candidateGeneSet,
                                    dataSet, survivalTimes, followup,
                                    random.samples, cpus, verbose)
 
-      results <- rbind(results, set_results)
-
-    }
-
-
-  }
-  # only one candidate set
-  else {
-
-    results <- sapsSingleSet(candidateGeneSets, dataSet, survivalTimes, followup,
-                         random.samples, cpus, verbose)
+    results$genesets[[setName]] <- set_results
 
   }
 
   # compute SAPS_score
-  results["saps_score"] <- apply(results, 1, calculateSAPSScore)
+  #results["saps_score"] <- apply(results, 1, calculateSAPSScore)
 
   return(results)
 
@@ -121,19 +114,21 @@ sapsSingleSet <- function(rankedGenes, candidateGeneSet, dataSet, survivalTimes,
 
   candidateSetSize = length(commonGenes)
 
-  results <- matrix(NA, nrow=1, ncol=3, dimnames=list(candidateSetName,
-                  c("Size","P_pure","P_random")))
+  # prepare results list
+  results <- list("size" = candidateSetSize,
+                  "saps_unadjusted" = vector(mode="numeric", length=3),
+                  "saps_adjusted" = vector(mode="numeric", length=3),
+                  "random_p_pures" = NA,
+                  "direction" = NA,
+                  "saps_score" = NA,
+                  "saps_score_adj" = NA)
 
-  dummy_cols <- matrix(NA, nrow=1, ncol=2, dimnames=list(NULL,
-                                        c("P_enrichment","direction")))
-
+  names(results$saps_unadjusted) <- c("p_pure", "p_random", "p_enrich")
+  names(results$saps_adjusted) <- c("p_pure", "p_random", "p_enrich")
 
   if(candidateSetSize == 0) {
 
     warning(c("No gene data found for gene set ", candidateSetName, ", cannot compute SAPS."))
-
-    # add dummy columns
-    results <- cbind(results, dummy_cols)
 
   }
   else {
@@ -141,7 +136,7 @@ sapsSingleSet <- function(rankedGenes, candidateGeneSet, dataSet, survivalTimes,
     if (verbose)
       message(c("Using gene set ", candidateSetName, ", size = ", candidateSetSize))
 
-    results[1, "Size"] <- candidateSetSize
+    results$size <- candidateSetSize
 
     scaledData <- scale(dataSet[,is.element(geneNames, commonGenes)])
 
@@ -149,7 +144,7 @@ sapsSingleSet <- function(rankedGenes, candidateGeneSet, dataSet, survivalTimes,
       message("Calculating P_pure...", appendLF=FALSE)
 
     p_pure <- calculatePPure(scaledData, survivalTimes, followup)
-    results[1, "P_pure"] <- p_pure
+    results$saps_unadjusted["p_pure"] <- p_pure
 
     if (verbose)
       message("done.")
@@ -157,7 +152,7 @@ sapsSingleSet <- function(rankedGenes, candidateGeneSet, dataSet, survivalTimes,
     if (verbose)
       message("Calculating P_random...", appendLF=FALSE)
 
-    results[1, "P_random"] <- calculatePRandom(dataSet, candidateSetSize, p_pure,
+    results$saps_unadjusted["p_random"] <- calculatePRandom(dataSet, candidateSetSize, p_pure,
                                                survivalTimes, followup, random.samples)
     if (verbose)
       message("done.")
@@ -167,12 +162,8 @@ sapsSingleSet <- function(rankedGenes, candidateGeneSet, dataSet, survivalTimes,
 
     gsa_results <- calculatePEnrichment(rankedGenes, candidateGeneSet, cpus)
 
-    # merge P_enrichment and direction with P_pure and P_random results
-    results <- merge(results, gsa_results, by="row.names")
-
-    # restore row names (merge quirk)
-    rownames(results) <- results$Row.names
-    results <- results[, -1]
+    results$saps_unadjusted["p_enrich"] <- gsa_results$P_enrichment
+    results["direction"] <- gsa_results$direction
 
     if (verbose)
       message("done.")
