@@ -101,6 +101,7 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
     set_results <- list("size" = candidateSetSize,
                     "saps_unadjusted" = vector(mode="numeric", length=3),
                     "saps_adjusted" = vector(mode="numeric", length=3),
+                    "cluster" = NA,
                     "random_p_pures" = NA,
                     "direction" = NA,
                     "saps_score" = NA,
@@ -126,8 +127,12 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
       if (verbose)
         message("Calculating P_pure...", appendLF=FALSE)
 
-      p_pure <- calculatePPure(scaledData, survivalTimes, followup)
+      pure <- calculatePPure(scaledData, survivalTimes, followup)
+
+      p_pure <- pure[["p_pure"]]
+
       set_results$saps_unadjusted["p_pure"] <- p_pure
+      set_results["cluster"] <- pure["cluster"]
 
       if (verbose)
         message("done.")
@@ -181,9 +186,6 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
     results$genesets[[setName]] <- set_results
 
   }
-
-  # compute SAPS_score
-  #results["saps_score"] <- apply(results, 1, calculateSAPSScore)
 
   return(results)
 
@@ -290,7 +292,9 @@ calculatePPure <- function(geneData, survivalTimes, followup) {
   # compute probability of no survival difference
   survtest <- survdiff(Surv(survivalTimes, followup) ~ cluster)
 
-  return (1 - pchisq(survtest$chisq, 1))
+  p_pure <- 1 - pchisq(survtest$chisq, 1)
+
+  return(list("p_pure"=p_pure, "cluster"=cluster))
 
 }
 
@@ -336,7 +340,7 @@ calculatePRandom <- function(dataSet, sampleSize, p_pure, survivalTimes, followu
 
     randomGeneSet <- scale(dataSet[, randomGeneNames])
 
-    p_pures[i] <- calculatePPure(randomGeneSet, survivalTimes, followup)
+    p_pures[i] <- calculatePPure(randomGeneSet, survivalTimes, followup)[["p_pure"]]
 
   }
 
