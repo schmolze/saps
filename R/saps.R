@@ -135,10 +135,13 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
       if (verbose)
         message("Calculating P_random...", appendLF=FALSE)
 
-      p_random <- calculatePRandom(dataSet, candidateSetSize, p_pure, survivalTimes,
+      random <- calculatePRandom(dataSet, candidateSetSize, p_pure, survivalTimes,
                                    followup, random.samples)
 
+      p_random <- random[["p_random"]]
+
       set_results$saps_unadjusted["p_random"] <- p_random
+      set_results["random_p_pures"] <- random["p_pures"]
 
       if (verbose)
         message("done.")
@@ -204,10 +207,9 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
 #' the number of cores (which will significantly improve the computational time).
 #' @return The function returns a matrix with the following columns:
 #'
-#' \code{P_enrichment  direction}
+#'  \item{P_enrichment}{the enrichment score}
+#'  \item{direction}{either 1 or -1 depending on the direction of association}
 #'
-#' \code{P_enrichment} is the enrichment score, while \code{direction} is
-#' either 1 or -1 depending on the direction of association.
 #' @seealso \code{\link{saps}} \code{\link[piano]{runGSA}}
 #' @references Beck AH, Knoblauch NW, Hefti MM, Kaplan J, Schnitt SJ, et al.
 #' (2013) Significance Analysis of Prognostic Signatures. PLoS Comput Biol 9(1):
@@ -338,7 +340,9 @@ calculatePRandom <- function(dataSet, sampleSize, p_pure, survivalTimes, followu
 
   }
 
-  return(sum(p_pures <= p_pure)/random.samples)
+  p_random <- sum(p_pures <= p_pure)/random.samples
+
+  return (list("p_random"=p_random, "p_pures"=p_pures))
 
 }
 
@@ -361,11 +365,10 @@ calculatePRandom <- function(dataSet, sampleSize, p_pure, survivalTimes, followu
 #' (i.e. patients) in \code{dataSet}.
 #' @return The function returns a matrix with two columns:
 #'
-#' \code{cindex  z}
+#' \item{cindex}{concordance index estimate.}
+#' \item{z}{z-score of the concordance index estimate.}
 #'
-#' and as many rows as \code{dataset}. \code{cindex} and \code{z}
-#' are the concordance index and corresponding z-score. The
-#' row names contain the gene identifiers.
+#' and as many rows as \code{dataset}. The row names contain the gene identifiers.
 #' @seealso \code{\link{saps}} \code{\link[survcomp]{concordance.index}}
 rankConcordance <- function(dataset, survivalTimes, followup) {
 
