@@ -59,6 +59,18 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes, followup, random.sam
 
   candidateSetCount <- nrow(candidateGeneSets)
 
+  # get concordance index
+
+  if (verbose)
+    message("Calculating concordance index...", appendLF=FALSE)
+
+  ci <- rankConcordance(dataSet, survivalTimes, followup)
+
+  rankedGenes <- ci[, -1]
+
+  if (verbose)
+    message("done.")
+
   results <- matrix(NA, nrow=0, ncol=5,
                     dimnames=list(NULL, c("Size","P_pure","P_random",
                                           "P_enrichment", "direction")))
@@ -70,8 +82,8 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes, followup, random.sam
 
     for (i in 1:candidateSetCount) {
 
-      set_results <- sapsSingleSet(candidateGeneSets[i,,drop=FALSE], dataSet,
-                                   survivalTimes, followup,
+      set_results <- sapsSingleSet(rankedGenes, candidateGeneSets[i,,drop=FALSE],
+                                   dataSet, survivalTimes, followup,
                                    random.samples, cpus, verbose)
 
       results <- rbind(results, set_results)
@@ -96,7 +108,8 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes, followup, random.sam
 }
 
 
-sapsSingleSet <- function(candidateGeneSet, dataSet, survivalTimes, followup, random.samples=25, cpus=1, verbose=TRUE) {
+sapsSingleSet <- function(rankedGenes, candidateGeneSet, dataSet, survivalTimes,
+                          followup, random.samples=25, cpus=1, verbose=TRUE) {
 
   candidateSetName <- row.names(candidateGeneSet)
 
@@ -151,15 +164,6 @@ sapsSingleSet <- function(candidateGeneSet, dataSet, survivalTimes, followup, ra
 
     if (verbose)
       message("Calculating P_enrichment...", appendLF=FALSE)
-
-    # get concordance index (only needs to be done once)
-    if (!exists("ci")) {
-
-      ci <- rankConcordance(dataSet, survivalTimes, followup)
-
-      rankedGenes <- ci[, -1]
-
-    }
 
     gsa_results <- calculatePEnrichment(rankedGenes, candidateGeneSet, cpus)
 
