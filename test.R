@@ -13,12 +13,12 @@ p_random <- testset$saps_unadjusted["p_random"]
 
 dd <- data.frame("time"=time, "event"=event, "cluster"=cluster)
 
-text <- paste("p_pure = ", round(p_pure, digits=3))
+text <- paste("p_pure = ", round(p_pure, digits=3), ", p_pure_adj = ",
+              round(p_pure_adj, digits=3))
 
 km.coxph.plot(formula.s = Surv(time/365, event) ~ cluster, data.s = dd,
-              main.title="KM Plot for P_pure",
+              main.title="Kaplan-Meier curves for geneset NAKAMURA_CANCER_MICROENVIRONMENT_UP",
               y.label="Probability of survival",
               x.label="Overall Survival (years)",
-              leg.text=paste(c("Group 1", "Group 2")),
               .lwd=2,
               o.text=text)
