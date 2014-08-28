@@ -1,5 +1,5 @@
 #' Implements Significance Analysis of Prognostic Signatures (SAPS), a
-#' robust method for determining prognostically significant gene sets.
+#' robust method for determining prognostically significant gene sets
 #'
 #' \code{\link{saps}} will usually be the only function needed.
 #'
@@ -25,15 +25,12 @@ NULL
 #' and the values are gene expression levels. Each row should contain data for a single
 #' patient.
 #' @param survivalTimes A vector of survival times. The length must equal the number of
-#' rows (i.e. patients) in \code{dataSet}. This parameter is used by
-#' \code{\link[survcomp]{concordance.index}} to compute the concordance index, which
-#' is in turn used by \code{\link{calculatePEnrichment}} to compute P_enrichment.
+#' rows (i.e. patients) in \code{dataSet}.
 #' @param followup A vector of 0 or 1 values, indicating whether the patient was
 #' lost to followup (0) or not (1). The length must equal the number of rows
 #' (i.e. patients) in \code{dataSet}.
-#' is in turn used by \code{\link{calculatePEnrichment}} to compute P_enrichment.
 #' @param random.samples An integer that specifies how many random gene sets to sample
-#' when computing P_random. Used by \code{\link{calculatePRandom}}.
+#' when computing P_random.
 #' @param cpus An integer that specifies the number of cpus/cores to be used when
 #' calculating P_enrichment. If greater than 1 (the default), the \pkg{snowfall}
 #' package must be installed or an error will occur.
@@ -48,7 +45,9 @@ NULL
 #'
 #' \code{genesets} is in turn a list with the following elements:
 #'
-#' \item{size}{The size of the geneset.}
+#' \item{name}{The name of the geneset.}
+#' \item{size}{The number of genes in the geneset.}
+#' \item{genes}{Vector of gene labels for this geneset.}
 #' \item{saps_unadjusted}{Vector with elements \code{p_pure}, \code{p_random}, and
 #'     \code{p_enrich}, containing the respective unadjusted p-values.}
 #' \item{saps_adjusted}{Vector with elements \code{p_pure}, \code{p_random}, and
@@ -56,7 +55,7 @@ NULL
 #'     comparisons (the number of comparisons is the number of genesets.)}
 #' \item{cluster}{Vector of assigned cluster (1 or 2) for each patient using this
 #'     candidate geneset.}
-#' \item{random_p_pures}{Vector of p_pure values for each random geneset calculated
+#' \item{random_p_pures}{Vector of p_pure values for each random geneset generated
 #'     during the computation of p_random.}
 #' \item{direction}{Direction (-1 or 1) of the enrichment association for this geneset.}
 #' \item{saps_score}{The unadjusted saps score for this geneset.}
@@ -99,8 +98,6 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
 
     candidateGeneSet <- candidateGeneSets[i,,drop=FALSE]
 
-    candidateSetName <- row.names(candidateGeneSet)
-
     setName <- setNames[i]
 
     # get candidate genes
@@ -110,7 +107,9 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
     candidateSetSize = length(commonGenes)
 
     # prepare results for this geneset
-    set_results <- list("size" = candidateSetSize,
+    set_results <- list("name" = setName,
+                    "genes" = commonGenes,
+                    "size" = candidateSetSize,
                     "saps_unadjusted" = vector(mode="numeric", length=3),
                     "saps_adjusted" = vector(mode="numeric", length=3),
                     "cluster" = NA,
@@ -124,13 +123,13 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
 
     if(candidateSetSize == 0) {
 
-      warning(c("No gene data found for gene set ", candidateSetName, ", cannot compute SAPS."))
+      warning(c("No gene data found for gene set ", setName, ", cannot compute SAPS."))
 
     }
     else {
 
       if (verbose)
-        message(c("Using gene set ", candidateSetName, ", size = ", candidateSetSize))
+        message(c("Using gene set ", setName, ", size = ", candidateSetSize))
 
       set_results$size <- candidateSetSize
 
@@ -402,6 +401,98 @@ rankConcordance <- function(dataset, survivalTimes, followup) {
   }
 
   return (t(apply(dataset, 2, concordance_f)))
+
+}
+
+
+#' @export
+#' @title Plot Kaplan-Meier curves for a gene set
+#' @description Plots Kaplan-Meier survival curves for a given gene set using the
+#'     cluster labels generated during the computation of \code{p_pure} to
+#'     stratify patients into two survival groups. The function is a wrapper for
+#'     \code{\link[survcomp]{km.coxph.plot}} in the \pkg{survcomp} package.
+#' @param geneset A geneset as returned by \code{\link{saps}}.
+#' @param survivalTimes A vector of survival times, as used in a call to
+#'     \code{\link{saps}}.
+#' @param followup A vector of 0 or 1 values, indicating whether the patient was
+#' lost to followup (0) or not (1), as used in a call to \code{\link{saps}}.
+#' @param title The plot title. Defaults to "Kaplan-Meier curves for geneset
+#'     [\code{geneset["name"]}]".
+#' @param y.label The y-axis label. Defaults to "Probability of survival".
+#' @param x.label The x-axis label. Defaults to "Overall survival".
+#' @param p.text Text to display in the lower left hand corner. Defaults to
+#'     displaying \code{p_pure} and \code{p_pure_adj}.
+#' @param ... Additional arguments to be passed to \code{\link[survcomp]{km.coxph.plot}}
+#' @seealso \code{\link{saps}} \code{\link{calculatePPure}}
+#'     \code{\link[survcomp]{km.coxph.plot}}
+plotKM <- function(geneset, survivalTimes, followup, title=NA, y.label=NA,
+                   x.label=NA, p.text=NA, ...) {
+
+  name <- geneset["name"]
+
+  if (is.na(title))
+    title <- paste("Kaplan-Meier curves for geneset ", name)
+
+  if (is.na(y.label))
+    y.label <- "Probability of survival"
+
+  if (is.na(x.label))
+    x.label <- "Overall survival"
+
+  cluster <- geneset$cluster
+  p_pure <- geneset$saps_unadjusted["p_pure"]
+  p_pure_adj <- geneset$saps_adjusted["p_pure"]
+
+  dd <- data.frame("time"=survivalTimes, "event"=followup, "cluster"=cluster)
+
+  text <- paste("p_pure = ", round(p_pure, digits=3), ", p_pure_adj = ",
+                round(p_pure_adj, digits=3))
+
+  km.coxph.plot(formula.s = Surv(survivalTimes, followup) ~ cluster, data.s = dd,
+                main.title=title,
+                y.label=y.label,
+                x.label=x.label,
+                o.text=text,
+                ...)
+
+}
+
+
+#' @export
+#' @title Draw density plot of \code{p_pure} values for random gene sets
+#' @description This function retrieves the \code{p_pure} values for the
+#'     random gene sets generated during the computation of \code{p_random} for
+#'     a given gene set. These are drawn as a density plot, with the value of
+#'     \code{p_pure} for the gene set indicated. The value of \code{p_random}
+#'     for the gene set is displayed as well.
+#' @param geneset A geneset as returned by \code{\link{saps}}.
+#' @param ... Additional arguments to be passed to \code{\link{plot}}
+#' @seealso \code{\link{saps}} \code{\link{calculatePRandom}}
+plotRandomDensity <- function(geneset,  ...) {
+
+  name <- geneset["name"]
+  p_pure <- geneset$saps_unadjusted["p_pure"]
+  p_random <- geneset$saps_unadjusted["p_random"]
+  random_p_pures <- geneset[["random_p_pures"]]
+
+  d <- density(-log10(random_p_pures))
+
+  title <- paste("Significance of p_pure for ", name, "vs. random gene sets")
+
+  plot(d, main=title, xlab="-log10 p_pure of random gene sets", cex=0.85)
+
+  polygon(d, col="red", border="blue")
+
+  arrows(x0=-log10(p_pure),x1=-log10(p_pure),y0=.25,y1=0.01,lwd=2)
+
+  text(paste("-log10 p_pure = ", round(-log10(p_pure), digits=3)),
+       x=-log10(p_pure), y=0.35, cex=0.8)
+
+  legend <- paste("-log 10 p_pure > ", sum(random_p_pures > p_pure), " of ",
+                  length(random_p_pures), " random   \n gene sets (p_random = ",
+                  p_random, ")   ", sep="")
+
+  mtext(legend, side=3, line=-2.5, adj=1)
 
 }
 
