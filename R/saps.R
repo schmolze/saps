@@ -39,16 +39,28 @@ NULL
 #' package must be installed or an error will occur.
 #' @param verbose A boolean indicating whether to display status messages during
 #' computation. Defaults to \code{TRUE}.
-#' @return The function returns a matrix with the following columns:
+#' @return The function returns a list with the following elements:
 #'
-#' \code{Size P_pure  P_random  P_enrichment  direction saps_score}
+#' \item{rankedGenes}{Vector of concordance index z-scores for the genes in
+#'    \code{dataSet}, named by gene identifier.}
+#' \item{geneset.count}{The number of gene sets analyzed.}
+#' \item{genesets}{A list of genesets (see below).}
 #'
-#' Each row represents a gene set, and the row names contain the gene set names.
-#' \code{Size} is the size of the gene set. \code{P_pure}, \code{P_random}, and
-#' \code{P_enrichment} are the respective SAPS statistics for the gene set, while
-#' \code{direction} is the direction of association for the enrichment score.
-#' saps_score is -log10 max(P_pure, P_random, P_enrichment) multiplied by
-#' \code{direction}.
+#' \code{genesets} is in turn a list with the following elements:
+#'
+#' \item{size}{The size of the geneset.}
+#' \item{saps_unadjusted}{Vector with elements \code{p_pure}, \code{p_random}, and
+#'     \code{p_enrich}, containing the respective unadjusted p-values.}
+#' \item{saps_adjusted}{Vector with elements \code{p_pure}, \code{p_random}, and
+#'     \code{p_enrich}, containing the respective p-values adjusted for multiple
+#'     comparisons (the number of comparisons is the number of genesets.)}
+#' \item{cluster}{Vector of assigned cluster (1 or 2) for each patient using this
+#'     candidate geneset.}
+#' \item{random_p_pures}{Vector of p_pure values for each random geneset calculated
+#'     during the computation of p_random.}
+#' \item{direction}{Direction (-1 or 1) of the enrichment association for this geneset.}
+#' \item{saps_score}{The unadjusted saps score for this geneset.}
+#' \item{saps_score_adj}{The saps score for this geneset adjusted for multiple comparisons.}
 #' @references Beck AH, Knoblauch NW, Hefti MM, Kaplan J, Schnitt SJ, et al.
 #' (2013) Significance Analysis of Prognostic Signatures. PLoS Comput Biol 9(1):
 #' e1002875.doi:10.1371/journal.pcbi.1002875
@@ -272,14 +284,17 @@ calculatePEnrichment <- function(rankedGenes, candidateGeneSet, cpus) {
 #' and \emph{p} genes in the candidate prognostic set. It is normally called
 #' by \code{\link{saps}}.
 #' @param geneData An \emph{nxp} matrix consisting of \emph{n} patients
-#' and \emph{p} genes in the candidate prognostic set.
+#' and \emph{p} genes in the candidate prognostic geneset.
 #' @param survivalTimes A vector of survival times. The length must equal
 #' the number of rows \emph{n} in \code{geneData}.
 #' @param followup A vector of 0 or 1 values, indicating whether the patient was
 #' lost to followup (0) or not (1). The length must equal the number of rows
 #' (i.e. patients) in \code{geneData}.
-#' @return A log-rank p-value indicating the probability that the two groups
-#' show no survival difference.
+#' @return A list with the following elements:
+#' \item{p_pure}{A log-rank p-value indicating the probability that the two groups
+#'     show no survival difference.}
+#' \item{cluster}{Vector of assigned cluster (1 or 2) for each patient using the
+#'     supplied candidate prognostic geneset.}
 #' @seealso \code{\link{saps}}
 #' @references Beck AH, Knoblauch NW, Hefti MM, Kaplan J, Schnitt SJ, et al.
 #' (2013) Significance Analysis of Prognostic Signatures. PLoS Comput Biol 9(1):
@@ -318,8 +333,11 @@ calculatePPure <- function(geneData, survivalTimes, followup) {
 #' lost to followup (0) or not (1). The length must equal the number of rows
 #' (i.e. patients) in \code{dataSet}.
 #' @param random.samples The number of random gene sets to sample.
-#' @return The proportion of randomly sampled gene sets with a calculated
-#' P_pure at least as significant as the provided \code{p_pure}.
+#' @return A list with the following elements:
+#' \item{p_random}{The proportion of randomly sampled gene sets with a calculated
+#'     p_pure at least as significant as the provided \code{p_pure}.}
+#' \item{p_pures}{A vector of calculated p_pure values for each randomly
+#'     generated geneset.}
 #' @seealso \code{\link{saps}}
 #' @references Beck AH, Knoblauch NW, Hefti MM, Kaplan J, Schnitt SJ, et al.
 #' (2013) Significance Analysis of Prognostic Signatures. PLoS Comput Biol 9(1):
