@@ -3,6 +3,7 @@
 export(calculatePEnrichment)
 export(calculatePPure)
 export(calculatePRandom)
+export(plotEnrichment)
 export(plotKM)
 export(plotRandomDensity)
 export(rankConcordance)

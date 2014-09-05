@@ -1,22 +1,21 @@
 library(saps)
 
-load("data/Breast_small.RData")
+#load("data/Breast_small.RData")
+load("/Users/Daniel/Desktop/breast_full.RData")
 
-results <- saps(geneSets[1:3,], dat, time, event, 1000, 4)
+test_genesets <- c("SEMBA_FHIT_TARGETS_DN",
+                  "CELL_DIVISION",
+                  "3_5_CYCLIC_NUCLEOTIDE_PHOSPHODIESTERASE_ACTIVITY",
+                  "AAACCAC,MIR-140")
 
-ci <- results$rankedGenes
+results <- saps(geneSets[test_genesets,], dat, time, event, 10000, 4)
 
-testset <- results$genesets[["NAKAMURA_CANCER_MICROENVIRONMENT_DN"]]
-genes <- testset[["genes"]]
+rankedGenes <- results$rankedGenes
 
-gene_vals <- ci[genes]
+testset <- results$genesets[["SEMBA_FHIT_TARGETS_DN"]]
 
 plotKM(testset, time/365, event, x.label="Overall survival (years)")
 
 plotRandomDensity(testset)
 
-#stripchart(wing[type=="apf"], pch=1, method="stack", main="Wing", xlim=range(wing), col="blue")
-#stripchart(wing[type=="af"],pch=2,method="stack",add=T, col="red")
-
-stripchart(ci, pch=1, main="Main Title", xlab="title")
-stripchart(gene_vals, pch="*", add=T, col="red")
+plotEnrichment(testset, results$rankedGenes)
