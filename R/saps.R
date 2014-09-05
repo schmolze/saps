@@ -30,7 +30,7 @@ NULL
 #' lost to followup (0) or not (1). The length must equal the number of rows
 #' (i.e. patients) in \code{dataSet}.
 #' @param random.samples An integer that specifies how many random gene sets to sample
-#' when computing P_random.
+#' when computing P_random. Defaults to 1000.
 #' @param cpus An integer that specifies the number of cpus/cores to be used when
 #' calculating P_enrichment. If greater than 1 (the default), the \pkg{snowfall}
 #' package must be installed or an error will occur.
@@ -64,7 +64,7 @@ NULL
 #' (2013) Significance Analysis of Prognostic Signatures. PLoS Comput Biol 9(1):
 #' e1002875.doi:10.1371/journal.pcbi.1002875
 saps <- function(candidateGeneSets, dataSet, survivalTimes,
-                 followup, random.samples=25, cpus=1, verbose=TRUE) {
+                 followup, random.samples=1000, cpus=1, verbose=TRUE) {
 
   if ((cpus > 1) & (!is.installed("snowfall")))
     stop("'snowfall' package not found (required for multiple CPU support)")
@@ -128,8 +128,10 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
     }
     else {
 
-      if (verbose)
+      if (verbose) {
         message(c("Using gene set ", setName, ", size = ", candidateSetSize))
+        message(c("gene set #", i, " of ", candidateSetCount))
+      }
 
       set_results$size <- candidateSetSize
 
