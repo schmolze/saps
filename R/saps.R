@@ -73,7 +73,6 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
 
   # prepare results
   results <- list("rankedGenes"=NA, "geneset.count"=candidateSetCount,
-                  "saps_unadjusted"=NA, "saps_adjusted"=NA,
                   "genesets"=list())
 
   # get concordance index
@@ -122,8 +121,16 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
     saps_adjusted[setName, "size"] <- candidateSetSize
 
     # prepare results for this geneset
-    set_results <- list("genes" = commonGenes, "cluster" = NA,
-                        "random_p_pures" = NA)
+    saps_vec <- vector(mode="numeric", length=5)
+    names(saps_vec) <- c("p_pure", "p_random", "p_enrich", "saps_score",
+                           "saps_qvalue")
+
+    set_results <- list("name" = setName, "size" = candidateSetSize,
+                        "genes" = commonGenes, "cluster" = NA,
+                        "random_p_pures" = NA, "direction" = NA,
+                        "saps_unadjusted" = saps_vec,
+                        "saps_adjusted" = saps_vec)
+
 
     if(candidateSetSize == 0) {
 
@@ -206,7 +213,7 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
   if (verbose)
     message("Calculating saps scores...", appendLF=FALSE)
 
-  p_max <- max(saps_unadjusted[,"p_pure"],
+  p_max <- pmax(saps_unadjusted[,"p_pure"],
                saps_unadjusted[,"p_random"],
                saps_unadjusted[,"p_enrich"])
 
@@ -216,7 +223,7 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
 
   saps_unadjusted[, "saps_score"] <- saps_scores
 
-  p_max <- max(saps_adjusted[,"p_pure"],
+  p_max <- pmax(saps_adjusted[,"p_pure"],
                saps_adjusted[,"p_random"],
                saps_adjusted[,"p_enrich"])
 
@@ -227,8 +234,17 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
   if (verbose)
     message("done.")
 
-  results$saps_unadjusted <- saps_unadjusted
-  results$saps_adjusted <- saps_adjusted
+  # finally, store each saps statistic with the corresponding
+  # geneSet in the results list
+  if (verbose)
+    message("Saving SAPS statistics...", appendLF=FALSE)
+
+  results$genesets <- lapply(results$genesets, save_saps,
+                            saps_unadjusted, saps_adjusted)
+
+  if (verbose)
+    message("done.")
+
 
   return(results)
 
@@ -439,4 +455,42 @@ rankConcordance <- function(dataset, survivalTimes, followup) {
 
 is.installed <- function(pkg) {
   return (is.element(pkg, installed.packages()[,1]))
+}
+
+
+save_saps <- function(geneSet, saps_unadj, saps_adj) {
+
+  name <- geneSet[["name"]]
+
+  size <- saps_unadj[name, "size"]
+  direction <- saps_unadj[name, "direction"]
+
+  p_pure <- saps_unadj[name, "p_pure"]
+  p_random <- saps_unadj[name, "p_random"]
+  p_enrich <- saps_unadj[name, "p_enrich"]
+  saps_score <- saps_unadj[name, "saps_score"]
+  saps_qvalue <- saps_unadj[name, "saps_qvalue"]
+
+  p_pure_adj <- saps_adj[name, "p_pure"]
+  p_random_adj <- saps_adj[name, "p_random"]
+  p_enrich_adj <- saps_adj[name, "p_enrich"]
+  saps_score_adj <- saps_adj[name, "saps_score"]
+  saps_qvalue_adj <- saps_adj[name, "saps_qvalue"]
+
+  geneSet["direction"] <- direction
+
+  geneSet$saps_unadjusted["p_pure"] <- p_pure
+  geneSet$saps_unadjusted["p_random"] <- p_random
+  geneSet$saps_unadjusted["p_enrich"] <- p_enrich
+  geneSet$saps_unadjusted["saps_score"] <- saps_score
+  geneSet$saps_unadjusted["saps_qvalue"] <- saps_qvalue
+
+  geneSet$saps_adjusted["p_pure"] <- p_pure_adj
+  geneSet$saps_adjusted["p_random"] <- p_random_adj
+  geneSet$saps_adjusted["p_enrich"] <- p_enrich_adj
+  geneSet$saps_adjusted["saps_score"] <- saps_score_adj
+  geneSet$saps_adjusted["saps_qvalue"] <- saps_qvalue_adj
+
+  return(geneSet)
+
 }
