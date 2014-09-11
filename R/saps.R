@@ -30,7 +30,7 @@ NULL
 #' lost to followup (0) or not (1). The length must equal the number of rows
 #' (i.e. patients) in \code{dataSet}.
 #' @param random.samples An integer that specifies how many random gene sets to sample
-#' when computing P_random. Defaults to 1000.
+#' when computing P_random. Defaults to 10000.
 #' @param cpus An integer that specifies the number of cpus/cores to be used when
 #' calculating P_enrichment. If greater than 1 (the default), the \pkg{snowfall}
 #' package must be installed or an error will occur.
@@ -64,7 +64,7 @@ NULL
 #' (2013) Significance Analysis of Prognostic Signatures. PLoS Comput Biol 9(1):
 #' e1002875.doi:10.1371/journal.pcbi.1002875
 saps <- function(candidateGeneSets, dataSet, survivalTimes,
-                 followup, random.samples=1000, cpus=1, verbose=TRUE) {
+                 followup, random.samples=10000, cpus=1, verbose=TRUE) {
 
   if ((cpus > 1) & (!is.installed("snowfall")))
     stop("'snowfall' package not found (required for multiple CPU support)")
@@ -73,6 +73,7 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
 
   # prepare results
   results <- list("rankedGenes"=NA, "geneset.count"=candidateSetCount,
+                  "saps_unadjusted"=NA, "saps_adjusted"=NA,
                   "genesets"=list())
 
   # get concordance index
@@ -90,8 +91,19 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
     message("done.")
 
 
-  setNames = rownames(candidateGeneSets)
+  setNames <- rownames(candidateGeneSets)
   geneNames <- colnames(dataSet)
+
+  # prepare the matrices that will hold the adjusted and
+  # unadjusted SAPS statistics
+  saps_unadjusted <- matrix(nrow=candidateSetCount, ncol=7,
+                            dimnames=list(setNames,
+                                          c("size", "p_pure",
+                                            "p_random", "p_enrich",
+                                            "direction", "saps_score",
+                                            "saps_qvalue")))
+
+  saps_adjusted <- saps_unadjusted
 
   # compute saps statistics for each candidate gene set
   for (i in 1:candidateSetCount) {
@@ -104,22 +116,14 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
     candidateGenes <- as.character(candidateGeneSet[!is.na(candidateGeneSet)])
     commonGenes <- intersect(geneNames, candidateGenes)
 
-    candidateSetSize = length(commonGenes)
+    candidateSetSize <- length(commonGenes)
+
+    saps_unadjusted[setName, "size"] <- candidateSetSize
+    saps_adjusted[setName, "size"] <- candidateSetSize
 
     # prepare results for this geneset
-    set_results <- list("name" = setName,
-                    "genes" = commonGenes,
-                    "size" = candidateSetSize,
-                    "saps_unadjusted" = vector(mode="numeric", length=3),
-                    "saps_adjusted" = vector(mode="numeric", length=3),
-                    "cluster" = NA,
-                    "random_p_pures" = NA,
-                    "direction" = NA,
-                    "saps_score" = NA,
-                    "saps_score_adj" = NA)
-
-    names(set_results$saps_unadjusted) <- c("p_pure", "p_random", "p_enrich")
-    names(set_results$saps_adjusted) <- c("p_pure", "p_random", "p_enrich")
+    set_results <- list("genes" = commonGenes, "cluster" = NA,
+                        "random_p_pures" = NA)
 
     if(candidateSetSize == 0) {
 
@@ -133,9 +137,7 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
         message(c("gene set #", i, " of ", candidateSetCount))
       }
 
-      set_results$size <- candidateSetSize
-
-      scaledData <- scale(dataSet[,is.element(geneNames, commonGenes)])
+      scaledData <- scale(dataSet[, commonGenes])
 
       if (verbose)
         message("Calculating P_pure...", appendLF=FALSE)
@@ -144,7 +146,7 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
 
       p_pure <- pure[["p_pure"]]
 
-      set_results$saps_unadjusted["p_pure"] <- p_pure
+      saps_unadjusted[setName, "p_pure"] <- p_pure
       set_results["cluster"] <- pure["cluster"]
 
       if (verbose)
@@ -158,7 +160,7 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
 
       p_random <- random[["p_random"]]
 
-      set_results$saps_unadjusted["p_random"] <- p_random
+      saps_unadjusted[setName, "p_random"] <- p_random
       set_results["random_p_pures"] <- random["p_pures"]
 
       if (verbose)
@@ -172,24 +174,9 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
       p_enrich <- gsa_results$P_enrichment
       direction <- gsa_results$direction
 
-      set_results$saps_unadjusted["p_enrich"] <- p_enrich
-      set_results["direction"] <- direction
-
-      # calculate adjusted p-values
-      set_results$saps_adjusted["p_pure"] <- p.adjust(p_pure, method="BH",
-                                                      n=candidateSetCount)
-      set_results$saps_adjusted["p_random"] <- p.adjust(p_random, method="BH",
-                                                      n=candidateSetCount)
-      set_results$saps_adjusted["p_enrich"] <- p.adjust(p_enrich, method="BH",
-                                                      n=candidateSetCount)
-
-      # calculate saps score, adjusted and unadjusted
-      p_max <- max(p_pure, p_random, p_enrich)
-      saps_score <- -log10(p_max) * direction
-      saps_score_adj <- p.adjust(saps_score, method="BH", n=candidateSetCount)
-
-      set_results["saps_score"] <- saps_score
-      set_results["saps_score_adj"] <- saps_score_adj
+      saps_unadjusted[setName, "p_enrich"] <- p_enrich
+      saps_unadjusted[setName, "direction"] <- direction
+      saps_adjusted[setName, "direction"] <- direction
 
       if (verbose)
         message("done.")
@@ -199,6 +186,49 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
     results$genesets[[setName]] <- set_results
 
   }
+
+  # adjust p-values
+  if (verbose)
+    message("Adjusting p-values...", appendLF=FALSE)
+
+  to_adjust <- saps_unadjusted[, c("p_pure", "p_random", "p_enrich")]
+
+  adjusted <- apply(to_adjust, 2, p.adjust, "BH")
+
+  saps_adjusted[, "p_pure"] <- adjusted[, "p_pure"]
+  saps_adjusted[, "p_random"] <- adjusted[, "p_random"]
+  saps_adjusted[, "p_enrich"] <- adjusted[, "p_enrich"]
+
+  if (verbose)
+    message("done.")
+
+  # calculate saps scores
+  if (verbose)
+    message("Calculating saps scores...", appendLF=FALSE)
+
+  p_max <- max(saps_unadjusted[,"p_pure"],
+               saps_unadjusted[,"p_random"],
+               saps_unadjusted[,"p_enrich"])
+
+  direction <- saps_unadjusted[,"direction"]
+
+  saps_scores <- -log10(p_max) * direction
+
+  saps_unadjusted[, "saps_score"] <- saps_scores
+
+  p_max <- max(saps_adjusted[,"p_pure"],
+               saps_adjusted[,"p_random"],
+               saps_adjusted[,"p_enrich"])
+
+  saps_scores <- -log10(p_max) * direction
+
+  saps_adjusted[, "saps_score"] <- saps_scores
+
+  if (verbose)
+    message("done.")
+
+  results$saps_unadjusted <- saps_unadjusted
+  results$saps_adjusted <- saps_adjusted
 
   return(results)
 
@@ -343,7 +373,7 @@ calculatePPure <- function(geneData, survivalTimes, followup) {
 #' @references Beck AH, Knoblauch NW, Hefti MM, Kaplan J, Schnitt SJ, et al.
 #' (2013) Significance Analysis of Prognostic Signatures. PLoS Comput Biol 9(1):
 #' e1002875.doi:10.1371/journal.pcbi.1002875
-calculatePRandom <- function(dataSet, sampleSize, p_pure, survivalTimes, followup, random.samples=25) {
+calculatePRandom <- function(dataSet, sampleSize, p_pure, survivalTimes, followup, random.samples=10000) {
 
   geneNames = colnames(dataSet)
 
@@ -406,97 +436,6 @@ rankConcordance <- function(dataset, survivalTimes, followup) {
 
 }
 
-
-#' @export
-#' @title Plot Kaplan-Meier curves for a gene set
-#' @description Plots Kaplan-Meier survival curves for a given gene set using the
-#'     cluster labels generated during the computation of \code{p_pure} to
-#'     stratify patients into two survival groups. The function is a wrapper for
-#'     \code{\link[survcomp]{km.coxph.plot}} in the \pkg{survcomp} package.
-#' @param geneset A geneset as returned by \code{\link{saps}}.
-#' @param survivalTimes A vector of survival times, as used in a call to
-#'     \code{\link{saps}}.
-#' @param followup A vector of 0 or 1 values, indicating whether the patient was
-#' lost to followup (0) or not (1), as used in a call to \code{\link{saps}}.
-#' @param title The plot title. Defaults to "Kaplan-Meier curves for geneset
-#'     [\code{geneset["name"]}]".
-#' @param y.label The y-axis label. Defaults to "Probability of survival".
-#' @param x.label The x-axis label. Defaults to "Overall survival".
-#' @param p.text Text to display in the lower left hand corner. Defaults to
-#'     displaying \code{p_pure} and \code{p_pure_adj}.
-#' @param ... Additional arguments to be passed to \code{\link[survcomp]{km.coxph.plot}}
-#' @seealso \code{\link{saps}} \code{\link{calculatePPure}}
-#'     \code{\link[survcomp]{km.coxph.plot}}
-plotKM <- function(geneset, survivalTimes, followup, title=NA, y.label=NA,
-                   x.label=NA, p.text=NA, ...) {
-
-  name <- geneset["name"]
-
-  if (is.na(title))
-    title <- paste("Kaplan-Meier curves for geneset ", name)
-
-  if (is.na(y.label))
-    y.label <- "Probability of survival"
-
-  if (is.na(x.label))
-    x.label <- "Overall survival"
-
-  cluster <- geneset$cluster
-  p_pure <- geneset$saps_unadjusted["p_pure"]
-  p_pure_adj <- geneset$saps_adjusted["p_pure"]
-
-  dd <- data.frame("time"=survivalTimes, "event"=followup, "cluster"=cluster)
-
-  text <- paste("p_pure = ", round(p_pure, digits=3), ", p_pure_adj = ",
-                round(p_pure_adj, digits=3))
-
-  km.coxph.plot(formula.s = Surv(survivalTimes, followup) ~ cluster, data.s = dd,
-                main.title=title,
-                y.label=y.label,
-                x.label=x.label,
-                o.text=text,
-                ...)
-
-}
-
-
-#' @export
-#' @title Draw density plot of \code{p_pure} values for random gene sets
-#' @description This function retrieves the \code{p_pure} values for the
-#'     random gene sets generated during the computation of \code{p_random} for
-#'     a given gene set. These are drawn as a density plot, with the value of
-#'     \code{p_pure} for the gene set indicated. The value of \code{p_random}
-#'     for the gene set is displayed as well.
-#' @param geneset A geneset as returned by \code{\link{saps}}.
-#' @param ... Additional arguments to be passed to \code{\link{plot}}
-#' @seealso \code{\link{saps}} \code{\link{calculatePRandom}}
-plotRandomDensity <- function(geneset,  ...) {
-
-  name <- geneset["name"]
-  p_pure <- geneset$saps_unadjusted["p_pure"]
-  p_random <- geneset$saps_unadjusted["p_random"]
-  random_p_pures <- geneset[["random_p_pures"]]
-
-  d <- density(-log10(random_p_pures))
-
-  title <- paste("Significance of p_pure for ", name, "vs. random gene sets")
-
-  plot(d, main=title, xlab="-log10 p_pure of random gene sets", cex=0.85)
-
-  polygon(d, col="red", border="blue")
-
-  arrows(x0=-log10(p_pure),x1=-log10(p_pure),y0=.25,y1=0.01,lwd=2)
-
-  text(paste("-log10 p_pure = ", round(-log10(p_pure), digits=3)),
-       x=-log10(p_pure), y=0.35, cex=0.8)
-
-  legend <- paste("-log 10 p_pure > ", sum(random_p_pures > p_pure), " of ",
-                  length(random_p_pures), " random   \n gene sets (p_random = ",
-                  p_random, ")   ", sep="")
-
-  mtext(legend, side=3, line=-2.5, adj=1)
-
-}
 
 is.installed <- function(pkg) {
   return (is.element(pkg, installed.packages()[,1]))

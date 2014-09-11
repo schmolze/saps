@@ -1,12 +1,20 @@
 library(saps)
 
-#load("data/Breast_small.RData")
-load("/Users/Daniel/Desktop/breast_full.RData")
+load("data/Breast_small.RData")
+#load("/Users/Daniel/Desktop/saps testing/fake.RData")
 #load("/Users/Daniel/Desktop/enriched_genes.RData")
 
-#results <- saps(geneSets[1:100,], dat, time, event, cpus=4)
+test_genesets <- c("NADERI_BREAST_CANCER_PROGNOSIS_UP",
+                   "HAHTOLA_MYCOSIS_FUNGOIDES_DN",
+                   "SEMBA_FHIT_TARGETS_DN",
+                   "NAKAMURA_CANCER_MICROENVIRONMENT_UP",
+                   "WINTER_HYPOXIA_UP")
 
-#testset <- results$genesets[["random1"]]
+
+results <- saps(geneSets[test_genesets,], dat, time, event,
+                random.samples=1000, cpus=4)
+
+testset <- results$genesets[["NADERI_BREAST_CANCER_PROGNOSIS_UP"]]
 
 plotKM(testset, time/365, event, x.label="Overall survival (years)")
 
