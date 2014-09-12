@@ -1,8 +1,6 @@
 library(saps)
 
-#load("data/Breast_small.RData")
-load("/Users/Daniel/Desktop/saps testing/fake.RData")
-#load("/Users/Daniel/Desktop/enriched_genes.RData")
+load("data/Breast_small.RData")
 
 test_genesets <- c("NADERI_BREAST_CANCER_PROGNOSIS_UP",
                    "HAHTOLA_MYCOSIS_FUNGOIDES_DN",
@@ -10,8 +8,7 @@ test_genesets <- c("NADERI_BREAST_CANCER_PROGNOSIS_UP",
                    "NAKAMURA_CANCER_MICROENVIRONMENT_UP",
                    "WINTER_HYPOXIA_UP")
 
-
-results <- saps(geneSets, dat, time, event,
+results <- saps(geneSets[test_genesets,], dat, time, event,
                 random.samples=1000, cpus=4)
 
 testset <- results$genesets[["NADERI_BREAST_CANCER_PROGNOSIS_UP"]]
