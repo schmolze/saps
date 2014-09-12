@@ -34,6 +34,12 @@ NULL
 #' @param cpus An integer that specifies the number of cpus/cores to be used when
 #' calculating P_enrichment. If greater than 1 (the default), the \pkg{snowfall}
 #' package must be installed or an error will occur.
+#' @param gsea.perm The number of permutations to be used when calculating
+#' p_enrich. This is passed to the \code{\link[piano]{runGSA}} function in the
+#' \pkg{piano} package. Defaults to 1000.
+#' @param compute_qvalue A boolean indicating whether to include calculation
+#' of the saps q_value. Setting this to \code{TRUE} will significantly
+#' increase the computational time.
 #' @param verbose A boolean indicating whether to display status messages during
 #' computation. Defaults to \code{TRUE}.
 #' @return The function returns a list with the following elements:
@@ -48,23 +54,23 @@ NULL
 #' \item{name}{The name of the geneset.}
 #' \item{size}{The number of genes in the geneset.}
 #' \item{genes}{Vector of gene labels for this geneset.}
-#' \item{saps_unadjusted}{Vector with elements \code{p_pure}, \code{p_random}, and
-#'     \code{p_enrich}, containing the respective unadjusted p-values.}
-#' \item{saps_adjusted}{Vector with elements \code{p_pure}, \code{p_random}, and
-#'     \code{p_enrich}, containing the respective p-values adjusted for multiple
-#'     comparisons (the number of comparisons is the number of genesets.)}
+#' \item{saps_unadjusted}{Vector with elements \code{p_pure}, \code{p_random},
+#'     \code{p_enrich}, \code{saps_score}, and \code{saps_qvalue} containing
+#'     the respective unadjusted p-values.}
+#' \item{saps_adjusted}{Vector with elements \code{p_pure}, \code{p_random},
+#'     \code{p_enrich}, \code{saps_score}, and \code{saps_qvalue} containing
+#'     the respective p-values adjusted for multiple comparisons.}
 #' \item{cluster}{Vector of assigned cluster (1 or 2) for each patient using this
 #'     candidate geneset.}
 #' \item{random_p_pures}{Vector of p_pure values for each random geneset generated
 #'     during the computation of p_random.}
 #' \item{direction}{Direction (-1 or 1) of the enrichment association for this geneset.}
-#' \item{saps_score}{The unadjusted saps score for this geneset.}
-#' \item{saps_score_adj}{The saps score for this geneset adjusted for multiple comparisons.}
 #' @references Beck AH, Knoblauch NW, Hefti MM, Kaplan J, Schnitt SJ, et al.
 #' (2013) Significance Analysis of Prognostic Signatures. PLoS Comput Biol 9(1):
 #' e1002875.doi:10.1371/journal.pcbi.1002875
 saps <- function(candidateGeneSets, dataSet, survivalTimes,
-                 followup, random.samples=10000, cpus=1, verbose=TRUE) {
+                 followup, random.samples=10000, cpus=1, gsea.perm=1000,
+                 compute_qvalue=FALSE, verbose=TRUE) {
 
   if ((cpus > 1) & (!is.installed("snowfall")))
     stop("'snowfall' package not found (required for multiple CPU support)")
@@ -176,7 +182,8 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
       if (verbose)
         message("Calculating P_enrichment...", appendLF=FALSE)
 
-      gsa_results <- calculatePEnrichment(rankedGenes, candidateGeneSet, cpus)
+      gsa_results <- calculatePEnrichment(rankedGenes, candidateGeneSet,
+                                          cpus, gsea.perm)
 
       p_enrich <- gsa_results$P_enrichment
       direction <- gsa_results$direction
@@ -279,7 +286,8 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
 #' Subramanian A, Tamayo P, Mootha VK, Mukherjee S, Ebert BL, et al. (2005)
 #' Gene set enrichment analysis: a knowledge-based approach for interpreting
 #' genome-wide expression profiles. Proc Natl Acad Sci U S A 102: 15545–15550.
-calculatePEnrichment <- function(rankedGenes, candidateGeneSet, cpus) {
+calculatePEnrichment <- function(rankedGenes, candidateGeneSet,
+                                 cpus, gsea.perm=1000) {
 
   # reshape candidate gene set into long form for piano input
   candidateSetLong <- (melt(as.matrix(candidateGeneSet), na.rm=TRUE))[, c("value", "Var1")]
@@ -288,7 +296,7 @@ calculatePEnrichment <- function(rankedGenes, candidateGeneSet, cpus) {
 
   # run GSEA using piano package
   gsa <- runGSA(rankedGenes, geneSetStat="gsea", signifMethod="geneSampling", adjMethod="fdr",
-                gsc=gsc, gsSizeLim=c(1, 250), nPerm=1000, ncpus=cpus, verbose=FALSE)
+                gsc=gsc, gsSizeLim=c(1, 250), nPerm=gsea.perm, ncpus=cpus, verbose=FALSE)
 
   # get p-values for up and down-regulated gene sets
   gsa_results <- cbind(names(gsa$gsc), gsa$pDistinctDirUp, gsa$pDistinctDirDn)
