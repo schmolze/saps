@@ -173,6 +173,10 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
 
       p_random <- random[["p_random"]]
 
+      # adjust 0 value
+      if (p_random == 0)
+        p_random <- 1/(random.samples+1)
+
       saps_unadjusted[setName, "p_random"] <- p_random
       set_results["random_p_pures"] <- random["p_pures"]
 
@@ -187,6 +191,11 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
 
       p_enrich <- gsa_results$P_enrichment
       direction <- gsa_results$direction
+
+
+      # adjust 0 values
+      if (p_enrich == 0)
+        p_enrich <- 1(gsea.perm+1)
 
       saps_unadjusted[setName, "p_enrich"] <- p_enrich
       saps_unadjusted[setName, "direction"] <- direction
