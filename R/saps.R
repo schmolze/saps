@@ -413,19 +413,21 @@ calculatePRandom <- function(dataSet, sampleSize, p_pure, survivalTimes, followu
   if (sampleSize == 1)
     sampleSize <- 2
 
-  # vector to hold P_pure values
-  p_pures <- vector(length=random.samples)
-
-  for (i in 1:random.samples) {
+  calculateRandomPPures <- function() {
 
     randomGeneNames <- sample(geneNames, sampleSize)
 
     randomGeneSet <- scale(dataSet[, randomGeneNames])
 
-    p_pures[i] <- calculatePPure(randomGeneSet, survivalTimes, followup)[["p_pure"]]
+    return(calculatePPure(randomGeneSet, survivalTimes, followup)[["p_pure"]])
 
   }
 
+  # calculate p_pures for randomly generated genesets
+  p_pures <- replicate(random.samples, calculateRandomPPures(), simplify=TRUE)
+
+  # p_random is the proportion of the random p_pures at least as significant
+  # as the p_pure for the candidate geneset
   p_random <- sum(p_pures <= p_pure)/random.samples
 
   return (list("p_random"=p_random, "p_pures"=p_pures))

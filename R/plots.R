@@ -66,7 +66,7 @@ plotRandomDensity <- function(geneset,  ...) {
   name <- geneset["name"]
   p_pure <- geneset$saps_unadjusted["p_pure"]
   p_random <- geneset$saps_unadjusted["p_random"]
-  p_random_adj <- geneset$saps_adjusted["p_random"]
+  p_random_adj <- round(geneset$saps_adjusted["p_random"], 3)
   random_p_pures <- geneset[["random_p_pures"]]
 
   d <- density(-log10(random_p_pures))

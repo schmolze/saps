@@ -11,7 +11,7 @@ test_genesets <- c("NADERI_BREAST_CANCER_PROGNOSIS_UP",
 results <- saps(geneSets[test_genesets,], dat, time, event,
                 random.samples=1000, cpus=4)
 
-testset <- results$genesets[["NADERI_BREAST_CANCER_PROGNOSIS_UP"]]
+testset <- results$genesets[["WINTER_HYPOXIA_UP"]]
 
 plotKM(testset, time/365, event, x.label="Overall survival (years)")
 
