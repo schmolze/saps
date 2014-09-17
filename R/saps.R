@@ -40,6 +40,8 @@ NULL
 #' @param compute_qvalue A boolean indicating whether to include calculation
 #' of the saps q_value. Setting this to \code{TRUE} will significantly
 #' increase the computational time.
+#' @param qvalue.samples An integer that specifies how many random gene sets to
+#' sample when computing the saps q_value. Defaults to 1000.
 #' @param verbose A boolean indicating whether to display status messages during
 #' computation. Defaults to \code{TRUE}.
 #' @return The function returns a list with the following elements:
@@ -64,13 +66,15 @@ NULL
 #'     candidate geneset.}
 #' \item{random_p_pures}{Vector of p_pure values for each random geneset generated
 #'     during the computation of p_random.}
+#' \item{random_saps_scores}{Vector of saps_score values for each random geneset
+#'     generated during the computation of saps_qvalue.}
 #' \item{direction}{Direction (-1 or 1) of the enrichment association for this geneset.}
 #' @references Beck AH, Knoblauch NW, Hefti MM, Kaplan J, Schnitt SJ, et al.
 #' (2013) Significance Analysis of Prognostic Signatures. PLoS Comput Biol 9(1):
 #' e1002875.doi:10.1371/journal.pcbi.1002875
 saps <- function(candidateGeneSets, dataSet, survivalTimes,
                  followup, random.samples=10000, cpus=1, gsea.perm=1000,
-                 compute_qvalue=FALSE, verbose=TRUE) {
+                 compute_qvalue=FALSE, qvalue.samples=1000, verbose=TRUE) {
 
   if ((cpus > 1) & (!is.installed("snowfall")))
     stop("'snowfall' package not found (required for multiple CPU support)")
@@ -133,8 +137,8 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
 
     set_results <- list("name" = setName, "size" = candidateSetSize,
                         "genes" = commonGenes, "cluster" = NA,
-                        "random_p_pures" = NA, "direction" = NA,
-                        "saps_unadjusted" = saps_vec,
+                        "random_p_pures" = NA, "random_saps_scores" = NA,
+                        "direction" = NA, "saps_unadjusted" = saps_vec,
                         "saps_adjusted" = saps_vec)
 
 
@@ -195,7 +199,7 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
 
       # adjust 0 values
       if (p_enrich == 0)
-        p_enrich <- 1(gsea.perm+1)
+        p_enrich <- 1/(gsea.perm+1)
 
       saps_unadjusted[setName, "p_enrich"] <- p_enrich
       saps_unadjusted[setName, "direction"] <- direction
@@ -204,26 +208,65 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
       if (verbose)
         message("done.")
 
+      # compute q_value if requested
+      if (compute_qvalue) {
+
+        saps_score <- -log10(max(p_pure, p_random, p_enrich)) * direction
+
+        if (verbose)
+          message("Calculating q_value...", appendLF=FALSE)
+
+        qval <- calculateQValue(dataSet, candidateSetSize, survivalTimes,
+                                   followup, saps_score, random.samples,
+                                   qvalue.samples, cpus, gsea.perm, rankedGenes)
+
+        q_value <- qval[["q_value"]]
+        saps_scores <- qval["random_saps_scores"]
+
+        # adjust 0 values
+        if (q_value == 0)
+          q_value <- 1/(qvalue.samples+1)
+
+        saps_unadjusted[setName, "saps_qvalue"] <- q_value
+
+        set_results["random_saps_scores"] <- saps_scores
+
+        if (verbose)
+          message("done.")
+
+      }
+
     }
 
     results$genesets[[setName]] <- set_results
 
   }
 
-  # adjust p-values
-  if (verbose)
-    message("Adjusting p-values...", appendLF=FALSE)
+  # adjust p-values (if needed)
+  if (candidateSetCount > 1) {
 
-  to_adjust <- saps_unadjusted[, c("p_pure", "p_random", "p_enrich")]
+    if (verbose)
+      message("Adjusting p-values...", appendLF=FALSE)
 
-  adjusted <- apply(to_adjust, 2, p.adjust, "BH")
+    if (compute_qvalue)
+      to_adjust <- saps_unadjusted[, c("p_pure", "p_random",
+                                      "p_enrich", "saps_qvalue")]
+    else
+      to_adjust <- saps_unadjusted[, c("p_pure", "p_random", "p_enrich")]
 
-  saps_adjusted[, "p_pure"] <- adjusted[, "p_pure"]
-  saps_adjusted[, "p_random"] <- adjusted[, "p_random"]
-  saps_adjusted[, "p_enrich"] <- adjusted[, "p_enrich"]
+    adjusted <- apply(to_adjust, 2, p.adjust, "BH")
 
-  if (verbose)
-    message("done.")
+    saps_adjusted[, "p_pure"] <- adjusted[, "p_pure"]
+    saps_adjusted[, "p_random"] <- adjusted[, "p_random"]
+    saps_adjusted[, "p_enrich"] <- adjusted[, "p_enrich"]
+
+    if (compute_qvalue)
+      saps_adjusted[, "saps_qvalue"] <- adjusted[, "saps_qvalue"]
+
+    if (verbose)
+      message("done.")
+
+  }
 
   # calculate saps scores
   if (verbose)
@@ -408,7 +451,7 @@ calculatePPure <- function(geneData, survivalTimes, followup) {
 #' e1002875.doi:10.1371/journal.pcbi.1002875
 calculatePRandom <- function(dataSet, sampleSize, p_pure, survivalTimes, followup, random.samples=10000) {
 
-  geneNames = colnames(dataSet)
+  geneNames <- colnames(dataSet)
 
   if (sampleSize == 1)
     sampleSize <- 2
@@ -433,6 +476,69 @@ calculatePRandom <- function(dataSet, sampleSize, p_pure, survivalTimes, followu
   return (list("p_random"=p_random, "p_pures"=p_pures))
 
 }
+
+
+#' @export
+#' @title Compute saps q-value
+#' @seealso \code{\link{saps}}
+#' @references Beck AH, Knoblauch NW, Hefti MM, Kaplan J, Schnitt SJ, et al.
+#' (2013) Significance Analysis of Prognostic Signatures. PLoS Comput Biol 9(1):
+#' e1002875.doi:10.1371/journal.pcbi.1002875
+calculateQValue <- function(dataSet, sampleSize, survivalTimes, followup,
+                            saps_score, random.samples, qvalue.samples,
+                            cpus, gsea.perm, rankedGenes) {
+
+  geneNames <- colnames(dataSet)
+
+  if (sampleSize == 1)
+    sampleSize <- 2
+
+  calculateRandomSapsScores <- function() {
+
+    # sample random geneset
+    randomGeneNames <- sample(geneNames, sampleSize)
+
+    randomGeneSet <- scale(dataSet[, randomGeneNames])
+
+    # put random geneset into correct format for piano input
+    random_name <- paste("random", sample(1:1000, 1), sep="")
+    gsa_geneset <- matrix(randomGeneNames, nrow=1, dimnames=list(random_name))
+
+    # calculate p_pure, p_random, p_enrich, saps_score
+    p_pure <- calculatePPure(randomGeneSet, survivalTimes, followup)[["p_pure"]]
+
+    p_random <- calculatePRandom(dataSet, sampleSize, p_pure, survivalTimes,
+                               followup, random.samples)[["p_random"]]
+
+    if (p_random == 0)
+      p_random <- 1/(random.samples+1)
+
+    gsa_results <- calculatePEnrichment(rankedGenes, gsa_geneset, cpus, gsea.perm)
+
+    p_enrich <- gsa_results$P_enrichment
+    direction <- gsa_results$direction
+
+    if (p_enrich == 0)
+      p_enrich <- 1/(gsea.perm+1)
+
+    random_saps_score <- -log10(max(p_pure, p_random, p_enrich)) * direction
+
+    return(random_saps_score)
+
+  }
+
+  # calculate saps scores for randomly generated genesets
+  saps_scores <- replicate(qvalue.samples, calculateRandomSapsScores(),
+                           simplify=TRUE)
+
+  # q_value is the proportion of the random saps scores at least as significant
+  # as the saps score for the candidate geneset
+  q_value <- sum(abs(saps_scores) >= abs(saps_score))/qvalue.samples
+
+  return(list("q_value"=q_value, "random_saps_scores"=saps_scores))
+
+}
+
 
 
 #' @export

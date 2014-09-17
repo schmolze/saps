@@ -92,6 +92,46 @@ plotRandomDensity <- function(geneset,  ...) {
 
 
 #' @export
+#' @title Draw density plot of \code{saps_score} values for random gene sets
+#' @description This function retrieves the \code{saps_score} values for the
+#'     random gene sets generated during the computation of \code{saps_qvalue} for
+#'     a given gene set. These are drawn as a density plot, with the value of
+#'     \code{saps_score} for the gene set indicated.
+#' @param geneset A geneset as returned by \code{\link{saps}}.
+#' @param ... Additional arguments to be passed to \code{\link{plot}}
+#' @seealso \code{\link{saps}} \code{\link{calculateQValue}}
+plotSapsScoreDensity <- function(geneset,  ...) {
+
+  name <- geneset["name"]
+  saps_score <- round(geneset$saps_unadjusted["saps_score"], 3)
+  saps_score_adj <- round(geneset$saps_adjusted["saps_score"], 3)
+  random_saps_scores <- abs(geneset[["random_saps_scores"]])
+
+  d <- density(-log10(random_saps_scores))
+
+  title <- paste("Significance of saps_score for ", name, "vs. random gene sets")
+
+  plot(d, main=title, xlab="-log10 saps_score of random gene sets", cex=0.85)
+
+  polygon(d, col=rgb(1, 0, 0, 0.5))
+
+  arrows(x0=-log10(saps_score),x1=-log10(saps_score),y0=.25,y1=0.01,lwd=2)
+
+  text(paste("-log10 saps_score = ", round(-log10(saps_score), digits=3)),
+       x=-log10(saps_score), y=0.35, cex=0.8)
+
+  legend <- paste("-log 10 saps_score > ", sum(random_saps_scores > saps_score),
+                  " of ", length(random_saps_scores),
+                  " random gene sets   \n (saps_score = ",
+                  saps_score, ", saps_score_adj = ", saps_score_adj, ")   ",
+                  sep="")
+
+  mtext(legend, side=3, line=-2.5, adj=1)
+
+}
+
+
+#' @export
 #' @title Plot concordance indices for a geneset
 #' @description This function draws concordance indices for a given geneset
 #'     relative to the concordance indices for all the genes in the dataset
