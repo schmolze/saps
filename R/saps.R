@@ -92,6 +92,7 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
 
   ci <- rankConcordance(dataSet, survivalTimes, followup)
 
+  # use z-scores of CI
   rankedGenes <- ci[, -1]
 
   results$rankedGenes <- rankedGenes
@@ -195,7 +196,6 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
 
       p_enrich <- gsa_results$P_enrichment
       direction <- gsa_results$direction
-
 
       # adjust 0 values
       if (p_enrich == 0)
@@ -480,6 +480,40 @@ calculatePRandom <- function(dataSet, sampleSize, p_pure, survivalTimes, followu
 
 #' @export
 #' @title Compute saps q-value
+#' @description This function computes the saps q-value for a candidate prognostic
+#' geneset by computing the saps score for randomly generated genesets and
+#' determining the proportion at least as significant as the saps score for
+#' the candidate set. This function is normally called by \code{\link{saps}}.
+#' @param dataSet A matrix, where the column names are gene identifiers
+#' and the values are gene expression levels. Each row should contain data for a
+#' single patient.
+#' @param sampleSize The desired size for the randomly sampled gene sets.
+#' @param survivalTimes A vector of survival times. The length must equal
+#' the number of rows in \code{dataSet}.
+#' @param followup A vector of 0 or 1 values, indicating whether the patient was
+#' lost to followup (0) or not (1). The length must equal the number of rows
+#' (i.e. patients) in \code{dataSet}.
+#' @param saps_score The saps score for the candidate geneset. The q-value is
+#' calculated as the proportion of random saps scores whose absolute value
+#' is >= to the provided saps score.
+#' @param random.samples The number of random gene sets to sample during
+#' the calculation of \code{P_random}.
+#' @param qvalue.samples The number of random gene sets to sample for
+#' purposes of computing the q-value.
+#' @param cpus An integer that specifies the number of cpus/cores to be used when
+#' calculating \code{P_enrichment}. If greater than 1, the
+#' \pkg{snowfall} package must be installed or an error will occur.
+#' @param gsea.perm The number of permutations to be used when calculating
+#' \code{P_enrich}. This is passed to the \code{\link[piano]{runGSA}} function
+#' in the \pkg{piano} package.
+#' @param rankedGenes A vector of ranking scores for each gene in \code{dataSet}.
+#' Ordinarily this will be the z-scores obtained by a call to
+#' \code{\link{rankConcordance}}.
+#' @return The function returns a list with two elements:
+#'
+#' \item{q_value}{the calculated q-value.}
+#' \item{random_saps_scores}{a vector of individual saps scores for each
+#' randomly generated geneset.}
 #' @seealso \code{\link{saps}}
 #' @references Beck AH, Knoblauch NW, Hefti MM, Kaplan J, Schnitt SJ, et al.
 #' (2013) Significance Analysis of Prognostic Signatures. PLoS Comput Biol 9(1):

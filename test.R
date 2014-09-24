@@ -1,6 +1,6 @@
 library(saps)
 
-load("data/Breast_small.RData")
+load("data/breast_small.RData")
 
 test_genesets <- c("NADERI_BREAST_CANCER_PROGNOSIS_UP",
                    "HAHTOLA_MYCOSIS_FUNGOIDES_DN",
@@ -9,10 +9,9 @@ test_genesets <- c("NADERI_BREAST_CANCER_PROGNOSIS_UP",
                    "WINTER_HYPOXIA_UP")
 
 results <- saps(geneSets[test_genesets,,drop=FALSE], dat, time, event,
-                random.samples=1000, cpus=4, compute_qvalue=TRUE,
-                qvalue.samples=10)
+                random.samples=1000, cpus=4)
 
-testset <- results$genesets[["NAKAMURA_CANCER_MICROENVIRONMENT_UP"]]
+testset <- results$genesets[["WINTER_HYPOXIA_UP"]]
 
 plotKM(testset, time/365, event, x.label="Overall survival (years)")
 
