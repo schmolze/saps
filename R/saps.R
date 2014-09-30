@@ -30,7 +30,7 @@ NULL
 #' lost to followup (0) or not (1). The length must equal the number of rows
 #' (i.e. patients) in \code{dataSet}.
 #' @param random.samples An integer that specifies how many random gene sets to sample
-#' when computing P_random. Defaults to 10000.
+#' when computing P_random. Defaults to 1000.
 #' @param cpus An integer that specifies the number of cpus/cores to be used when
 #' calculating P_enrichment. If greater than 1 (the default), the \pkg{snowfall}
 #' package must be installed or an error will occur.
@@ -50,7 +50,14 @@ NULL
 #'    \code{dataSet}, named by gene identifier.}
 #' \item{geneset.count}{The number of gene sets analyzed.}
 #' \item{genesets}{A list of genesets (see below).}
-#'
+#' \item{saps_table}{A dataframe summarizing the adjusted and unadjusted
+#'    saps statistics for each geneset analyzed. The dataframe contains
+#'    the following columns: \code{size, p_pure, p_random, p_enrich,
+#'    direction, saps_score, saps_qvalue, p_pure_adj, p_random_adj,
+#'    p_enrich_adj, saps_score_adj, saps_qvalue_adj}. Each row summarizes
+#'    a single geneset. Note that the saps statistics are stored
+#'    with each individual \code{geneset} as well; this table is
+#'    provided simply for convenience.}
 #' \code{genesets} is in turn a list with the following elements:
 #'
 #' \item{name}{The name of the geneset.}
@@ -73,7 +80,7 @@ NULL
 #' (2013) Significance Analysis of Prognostic Signatures. PLoS Comput Biol 9(1):
 #' e1002875.doi:10.1371/journal.pcbi.1002875
 saps <- function(candidateGeneSets, dataSet, survivalTimes,
-                 followup, random.samples=10000, cpus=1, gsea.perm=1000,
+                 followup, random.samples=1000, cpus=1, gsea.perm=1000,
                  compute_qvalue=FALSE, qvalue.samples=1000, verbose=TRUE) {
 
   if ((cpus > 1) & (!is.installed("snowfall")))
@@ -83,7 +90,7 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
 
   # prepare results
   results <- list("rankedGenes"=NA, "geneset.count"=candidateSetCount,
-                  "genesets"=list())
+                  "genesets"=list(), "saps_table"=NA)
 
   # get concordance index
 
@@ -294,12 +301,31 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
     message("done.")
 
   # finally, store each saps statistic with the corresponding
-  # geneSet in the results list
+  # geneSet in the results list (also save the statistics in the
+  # saps_test convenience table)
   if (verbose)
     message("Saving SAPS statistics...", appendLF=FALSE)
 
+  saps_table <- data.frame("size"=saps_unadjusted[, "size"],
+                           "p_pure"=saps_unadjusted[,"p_pure"],
+                           "p_random"=saps_unadjusted[, "p_random"],
+                           "p_enrich"=saps_unadjusted[, "p_enrich"],
+                           "direction"=saps_unadjusted[, "direction"],
+                           "saps_score"=saps_unadjusted[, "saps_score"],
+                           "saps_qvalue"=saps_unadjusted[, "saps_qvalue"],
+                           "p_pure_adj"=saps_adjusted[, "p_pure"],
+                           "p_random_adj"=saps_adjusted[, "p_random"],
+                           "p_enrich_adj"=saps_adjusted[, "p_enrich"],
+                           "saps_score_adj"=saps_adjusted[, "saps_score"],
+                           "saps_qvalue_adj"=saps_adjusted[, "saps_qvalue"])
+
+  rownames(saps_table) <- rownames(saps_unadjusted)
+
   results$genesets <- lapply(results$genesets, save_saps,
                             saps_unadjusted, saps_adjusted)
+
+
+  results$saps_table <- saps_table
 
   if (verbose)
     message("done.")
