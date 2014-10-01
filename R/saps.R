@@ -16,6 +16,22 @@ NULL
 #' @title Compute SAPS statistics
 #' @description This is the main user interface to the \pkg{saps} package, and is
 #' usually the only function needed.
+#' @details saps provides a robust method for identifying biologically significant
+#' gene sets associated with patient survival. Three basic statistics are computed.
+#' First, patients are clustered into two survival groups based on differential
+#' expression of a candidate gene set. p_pure is calculated as the probability of
+#' no survival difference between the two groups.
+#'
+#' Next, the same procedure is applied to randomly generated gene sets, and p_random
+#' is calculated as the proportion achieving a p_pure as significant as the candidate
+#' gene set. Finally, a pre-ranked Gene Set Enrichment Analysis (GSEA) is performed
+#' by ranking all genes by concordance index, and p_enrich is computed to indicate
+#' the degree to which the candidate gene set is enriched for genes with univariate
+#' prognostic significance.
+#'
+#' A saps_score is calculated to summarize the three statistics, and
+#' optionally a saps_qvalue is computed to estimate the significance of the
+#' saps_score by calculating the saps_score for random gene sets.
 #' @param candidateGeneSets A matrix with at least one row, where each row represents
 #' a gene set, and the column values are gene identifiers. The row names should contain
 #' unique names for the gene sets. The column values may contain \code{NA} values, since
@@ -103,7 +119,8 @@ NULL
 #' # view results
 #' saps_table <- results$saps_table
 #' saps_table
-#'
+#' @seealso \code{\link[survival]{survdiff}} \code{\link[survcomp]{concordance.index}}
+#'     \code{\link[piano]{runGSA}}
 #' @references Beck AH, Knoblauch NW, Hefti MM, Kaplan J, Schnitt SJ, et al.
 #' (2013) Significance Analysis of Prognostic Signatures. PLoS Comput Biol 9(1):
 #' e1002875.doi:10.1371/journal.pcbi.1002875
