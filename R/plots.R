@@ -104,23 +104,24 @@ plotSapsScoreDensity <- function(geneset,  ...) {
 
   name <- geneset["name"]
   saps_score <- round(geneset$saps_unadjusted["saps_score"], 3)
+  saps_score_abs <- abs(saps_score)
   saps_score_adj <- round(geneset$saps_adjusted["saps_score"], 3)
   random_saps_scores <- abs(geneset[["random_saps_scores"]])
 
   d <- density(-log10(random_saps_scores))
 
-  title <- paste("Significance of saps_score for ", name, "vs. random gene sets")
+  title <- paste("Significance of saps score for ", name, "vs. random gene sets")
 
-  plot(d, main=title, xlab="-log10 saps_score of random gene sets", cex=0.85)
+  plot(d, main=title, xlab="-log10 saps score of random gene sets", cex=0.85)
 
   polygon(d, col=rgb(1, 0, 0, 0.5))
 
-  arrows(x0=-log10(saps_score),x1=-log10(saps_score),y0=.25,y1=0.01,lwd=2)
+  arrows(x0=-log10(saps_score_abs),x1=-log10(saps_score_abs),y0=.25,y1=0.01,lwd=2)
 
-  text(paste("-log10 saps_score = ", round(-log10(saps_score), digits=3)),
-       x=-log10(saps_score), y=0.35, cex=0.8)
+  text(paste("-log10 \n          saps score = ", round(-log10(saps_score_abs),
+                        digits=3)), x=-log10(saps_score_abs), y=0.3, cex=0.8)
 
-  legend <- paste("-log 10 saps_score > ", sum(random_saps_scores > saps_score),
+  legend <- paste("-log 10 saps_score > ", sum(random_saps_scores > saps_score_abs),
                   " of ", length(random_saps_scores),
                   " random gene sets   \n (saps_score = ",
                   saps_score, ", saps_score_adj = ", saps_score_adj, ")   ",
