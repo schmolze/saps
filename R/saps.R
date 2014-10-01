@@ -425,13 +425,14 @@ calculatePEnrichment <- function(rankedGenes, candidateGeneSet,
                                  cpus, gsea.perm=1000) {
 
   # reshape candidate gene set into long form for piano input
-  candidateSetLong <- (melt(as.matrix(candidateGeneSet), na.rm=TRUE))[, c("value", "Var1")]
+  candidateSetLong <- (reshape2::melt(as.matrix(candidateGeneSet), na.rm=TRUE))[, c("value", "Var1")]
 
-  gsc <- loadGSC(candidateSetLong, type="data.frame")
+  gsc <- piano::loadGSC(candidateSetLong, type="data.frame")
 
   # run GSEA using piano package
-  gsa <- runGSA(rankedGenes, geneSetStat="gsea", signifMethod="geneSampling", adjMethod="fdr",
-                gsc=gsc, gsSizeLim=c(1, 250), nPerm=gsea.perm, ncpus=cpus, verbose=FALSE)
+  gsa <- piano::runGSA(rankedGenes, geneSetStat="gsea", signifMethod="geneSampling",
+                adjMethod="fdr", gsc=gsc, gsSizeLim=c(1, 250), nPerm=gsea.perm,
+                ncpus=cpus, verbose=FALSE)
 
   # get p-values for up and down-regulated gene sets
   gsa_results <- cbind(names(gsa$gsc), gsa$pDistinctDirUp, gsa$pDistinctDirDn)
@@ -524,7 +525,7 @@ calculatePPure <- function(geneData, survivalTimes, followup) {
   cluster <- kmeans(geneData, 2)$cluster
 
   # compute probability of no survival difference
-  survtest <- survdiff(Surv(survivalTimes, followup) ~ cluster)
+  survtest <- survival::survdiff(survival::Surv(survivalTimes, followup) ~ cluster)
 
   p_pure <- 1 - pchisq(survtest$chisq, 1)
 
@@ -770,7 +771,9 @@ rankConcordance <- function(dataset, survivalTimes, followup) {
 
   concordance_f <- function(x) {
 
-    tt <- concordance.index(x, surv.time=survivalTimes, surv.event=followup, method="noether", na.rm=TRUE)
+    tt <- survcomp::concordance.index(x, surv.time=survivalTimes,
+                  surv.event=followup, method="noether", na.rm=TRUE)
+
     return (c("cindex"=tt$c.index, "z"=(tt$c.index - 0.5)/tt$se))
 
   }

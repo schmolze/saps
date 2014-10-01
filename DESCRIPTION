@@ -5,9 +5,10 @@ Version: 0.1
 Author: Daniel Schmolze <saps@schmolze.com>
 Maintainer: Daniel Schmolze <saps@schmolze.com>
 Depends:
-    R (>= 2.14.0),
+    R (>= 2.14.0)
+Imports:
     piano,
-    survcomp,
+    survival,
     reshape2
 Suggests:
     snowfall,
