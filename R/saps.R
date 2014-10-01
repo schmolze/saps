@@ -76,6 +76,34 @@ NULL
 #' \item{random_saps_scores}{Vector of saps_score values for each random geneset
 #'     generated during the computation of saps_qvalue.}
 #' \item{direction}{Direction (-1 or 1) of the enrichment association for this geneset.}
+#' @examples
+#' # 50 patients, none lost to followup
+#' followup <- rep(1, 50)
+#'
+#' # first 5 patients have good survival (in days)
+#' time <- c(20, 23, 25, 24, 27, sample(1:5, 45, TRUE))
+#' time <- time*365
+#'
+#' # create data for 1000 genes, 50 patients
+#' dat <- matrix(rnorm(50*1000), nrow=50, ncol=1000)
+#' colnames(dat) <- as.character(1:1000)
+#'
+#' # create three genesets, first with specified genes,
+#' # others with randomly selected genes
+#' set1 <- c("10", "41", "11", "42", "50")
+#' set2 <- sample(colnames(dat), 5)
+#' set3 <- sample(colnames(dat), 5)
+#'
+#' # increase expression levels for set1 for first 5 patients
+#' dat[1:5, set1] <- dat[1:5, set1]+10
+#'
+#' # compute saps statistics
+#' results <- saps(genesets, dat, time, followup)
+#'
+#' # view results
+#' saps_table <- results$saps_table
+#' saps_table
+#'
 #' @references Beck AH, Knoblauch NW, Hefti MM, Kaplan J, Schnitt SJ, et al.
 #' (2013) Significance Analysis of Prognostic Signatures. PLoS Comput Biol 9(1):
 #' e1002875.doi:10.1371/journal.pcbi.1002875
@@ -356,6 +384,35 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
 #'  \item{P_enrichment}{the enrichment score}
 #'  \item{direction}{either 1 or -1 depending on the direction of association}
 #'
+#' @examples
+#' # create followup and survival vectors
+#' followup <- rep(1, 50)
+#' time <- c(20, 23, 25, 24, 27, sample(1:5, 45, TRUE))*365
+#'
+#' # create fake gene data (50 patients, 1000 genes)
+#' dat <- matrix(rnorm(50*1000), nrow=50, ncol=1000)
+#' colnames(dat) <- as.character(1:1000)
+#'
+#' # create genesets
+#' set1 <- c("10", "41", "11", "42", "50")
+#' set2 <- sample(colnames(dat), 5)
+#' set3 <- sample(colnames(dat), 5)
+#'
+#' genesets <- rbind(set1, set2, set3)
+#'
+#' # tweak data for first 5 patients for set1
+#' dat[1:5, set1] <- dat[1:5, set1]+10
+#'
+#' # rank all genes by concordance index
+#' ci <- rankConcordance(dat, time, followup)[,"z"]
+#'
+#' # set1 should achieve significance
+#' p_enrich <- calculatePEnrichment(ci, genesets["set1",,drop=FALSE], cpus=1)
+#' p_enrich
+#'
+#' # set2 should not
+#' p_enrich <- calculatePEnrichment(ci, genesets["set2",,drop=FALSE], cpus=1)
+#' p_enrich
 #' @seealso \code{\link{saps}} \code{\link[piano]{runGSA}}
 #' @references Beck AH, Knoblauch NW, Hefti MM, Kaplan J, Schnitt SJ, et al.
 #' (2013) Significance Analysis of Prognostic Signatures. PLoS Comput Biol 9(1):
@@ -428,6 +485,35 @@ calculatePEnrichment <- function(rankedGenes, candidateGeneSet,
 #'     show no survival difference.}
 #' \item{cluster}{Vector of assigned cluster (1 or 2) for each patient using the
 #'     supplied candidate prognostic geneset.}
+#' @examples
+#' # create followup and survival vectors
+#' followup <- rep(1, 50)
+#' time <- c(20, 23, 25, 24, 27, sample(1:5, 45, TRUE))*365
+#'
+#' # create fake gene data (50 patients, 1000 genes)
+#' dat <- matrix(rnorm(50*1000), nrow=50, ncol=1000)
+#' colnames(dat) <- as.character(1:1000)
+#'
+#' # create genesets
+#' set1 <- c("10", "41", "11", "42", "50")
+#' set2 <- sample(colnames(dat), 5)
+#' set3 <- sample(colnames(dat), 5)
+#'
+#' # get gene data for set1
+#' set1_data <- dat[, set1]
+#'
+#' # shouldn't achieve significance
+#' p_pure <- calculatePPure(set1_data, time, followup)
+#' p_pure$p_pure
+#'
+#' # alter expression data for first 5 patients for set1
+#' dat[1:5, set1] <- dat[1:5, set1]+10
+#'
+#' set1_data <- dat[, set1]
+#'
+#' # now p_pure should be significant
+#' p_pure <- calculatePPure(set1_data, time, followup)
+#' p_pure$p_pure
 #' @seealso \code{\link{saps}}
 #' @references Beck AH, Knoblauch NW, Hefti MM, Kaplan J, Schnitt SJ, et al.
 #' (2013) Significance Analysis of Prognostic Signatures. PLoS Comput Biol 9(1):
@@ -471,6 +557,28 @@ calculatePPure <- function(geneData, survivalTimes, followup) {
 #'     p_pure at least as significant as the provided \code{p_pure}.}
 #' \item{p_pures}{A vector of calculated p_pure values for each randomly
 #'     generated geneset.}
+#' @examples
+#' # create followup and survival vectors
+#' followup <- rep(1, 50)
+#' time <- c(20, 23, 25, 24, 27, sample(1:5, 45, TRUE))*365
+#'
+#' # create fake gene data (50 patients, 1000 genes)
+#' dat <- matrix(rnorm(50*1000), nrow=50, ncol=1000)
+#' colnames(dat) <- as.character(1:1000)
+#'
+#' # relatively low threshold
+#' p_pure <- 0.05
+#'
+#' p_random <- calculatePRandom(dat, 5, p_pure, time, followup)
+#' p_random$p_random
+#' hist(p_random$p_pures)
+#' length(p_random$p_pures[p_random$p_pures <= p_pure])
+#'
+#' # set a more stringent threshold
+#' p_pure <- 0.001
+#'
+#' p_random <- calculatePRandom(dat, 5, p_pure, time, followup)
+#' length(p_random$p_pures[p_random$p_pures <= p_pure])
 #' @seealso \code{\link{saps}}
 #' @references Beck AH, Knoblauch NW, Hefti MM, Kaplan J, Schnitt SJ, et al.
 #' (2013) Significance Analysis of Prognostic Signatures. PLoS Comput Biol 9(1):
@@ -540,6 +648,27 @@ calculatePRandom <- function(dataSet, sampleSize, p_pure, survivalTimes, followu
 #' \item{q_value}{the calculated q-value.}
 #' \item{random_saps_scores}{a vector of individual saps scores for each
 #' randomly generated geneset.}
+#' @examples
+#' # create followup and survival vectors
+#' followup <- rep(1, 50)
+#' time <- c(20, 23, 25, 24, 27, sample(1:5, 45, TRUE))*365
+#'
+#' # create fake gene data (50 patients, 1000 genes)
+#' dat <- matrix(rnorm(50*1000), nrow=50, ncol=1000)
+#' colnames(dat) <- as.character(1:1000)
+#'
+#' # borderline significant saps score
+#' saps_score <- 1.3
+#' rankedGenes <- rankConcordance(dat, time, followup)[,"z"]
+#'
+#' # go get some coffee...
+#' q_value < -calculateQValue(dat, 5, time, followup, saps_score, random.samples=1000,
+#'      qvalue.samples=100, cpus=4, gsea.perm=1000, rankedGenes)
+#'
+#' q_value$q_value
+#' random_scores <- abs(q_value$random_saps_scores)
+#' hist(random_scores)
+#' length(random_scores[random_scores > saps_score])
 #' @seealso \code{\link{saps}}
 #' @references Beck AH, Knoblauch NW, Hefti MM, Kaplan J, Schnitt SJ, et al.
 #' (2013) Significance Analysis of Prognostic Signatures. PLoS Comput Biol 9(1):
@@ -623,6 +752,19 @@ calculateQValue <- function(dataSet, sampleSize, survivalTimes, followup,
 #' \item{z}{z-score of the concordance index estimate.}
 #'
 #' and as many rows as \code{dataset}. The row names contain the gene identifiers.
+#' @examples
+#' # create followup and survival vectors
+#' followup <- rep(1, 50)
+#' time <- c(20, 23, 25, 24, 27, sample(1:5, 45, TRUE))*365
+#'
+#' # create fake gene data (50 patients, 1000 genes)
+#' dat <- matrix(rnorm(50*1000), nrow=50, ncol=1000)
+#' colnames(dat) <- as.character(1:1000)
+#'
+#' ci <- rankConcordance(dat, time, followup)
+#' z <- ci[,"z"]
+#' range(z)
+#' hist(z)
 #' @seealso \code{\link{saps}} \code{\link[survcomp]{concordance.index}}
 rankConcordance <- function(dataset, survivalTimes, followup) {
 
