@@ -23,10 +23,11 @@ Depends:
 Imports:
     piano,
     survival,
+    survcomp,
     reshape2
 Suggests:
     snowfall,
     knitr
-License: MIT
+License: MIT + file LICENSE
 LazyData: true
 VignetteBuilder: knitr

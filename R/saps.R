@@ -110,6 +110,8 @@ NULL
 #' set2 <- sample(colnames(dat), 5)
 #' set3 <- sample(colnames(dat), 5)
 #'
+#' genesets <- rbind(set1, set2, set3)
+#'
 #' # increase expression levels for set1 for first 5 patients
 #' dat[1:5, set1] <- dat[1:5, set1]+10
 #'
@@ -396,6 +398,8 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
 #' @param cpus This value is passed to the \code{\link[piano]{runGSA}} function
 #' in the \pkg{piano} package. For multi-core CPUs, this value should be set to
 #' the number of cores (which will significantly improve the computational time).
+#' @param gsea.perm The number of permutations to be used in the GSEA. This
+#' value is passed to \code{\link[piano]{runGSA}}.
 #' @return The function returns a matrix with the following columns:
 #'
 #'  \item{P_enrichment}{the enrichment score}
@@ -437,7 +441,7 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
 #'
 #' Subramanian A, Tamayo P, Mootha VK, Mukherjee S, Ebert BL, et al. (2005)
 #' Gene set enrichment analysis: a knowledge-based approach for interpreting
-#' genome-wide expression profiles. Proc Natl Acad Sci U S A 102: 15545–15550.
+#' genome-wide expression profiles. Proc Natl Acad Sci USA 102: 15545-15550.
 calculatePEnrichment <- function(rankedGenes, candidateGeneSet,
                                  cpus, gsea.perm=1000) {
 
@@ -680,13 +684,15 @@ calculatePRandom <- function(dataSet, sampleSize, p_pure, survivalTimes, followu
 #' rankedGenes <- rankConcordance(dat, time, followup)[,"z"]
 #'
 #' # go get some coffee...
-#' q_value < -calculateQValue(dat, 5, time, followup, saps_score, random.samples=1000,
+#' \dontrun{
+#' q_value <- calculateQValue(dat, 5, time, followup, saps_score, random.samples=1000,
 #'      qvalue.samples=100, cpus=4, gsea.perm=1000, rankedGenes)
 #'
 #' q_value$q_value
 #' random_scores <- abs(q_value$random_saps_scores)
 #' hist(random_scores)
 #' length(random_scores[random_scores > saps_score])
+#' }
 #' @seealso \code{\link{saps}}
 #' @references Beck AH, Knoblauch NW, Hefti MM, Kaplan J, Schnitt SJ, et al.
 #' (2013) Significance Analysis of Prognostic Signatures. PLoS Comput Biol 9(1):

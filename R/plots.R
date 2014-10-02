@@ -41,7 +41,8 @@ plotKM <- function(geneset, survivalTimes, followup, title=NA, y.label=NA,
   text <- paste("p_pure = ", round(p_pure, digits=3), ", p_pure_adj = ",
                 round(p_pure_adj, digits=3))
 
-  km.coxph.plot(formula.s = Surv(survivalTimes, followup) ~ cluster, data.s = dd,
+  survcomp::km.coxph.plot(formula.s = Surv(survivalTimes, followup) ~ cluster,
+                data.s = dd,
                 main.title=title,
                 y.label=y.label,
                 x.label=x.label,
