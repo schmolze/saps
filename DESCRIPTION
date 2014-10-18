@@ -15,14 +15,22 @@ Description: Functions implementing the Significance Analysis of Prognostic
     significance. A SAPS_score is calculated to summarize the three statistics,
     and optionally a Q-value is computed to estimate the significance of the
     SAPS_score by calculating SAPS_scores for random gene sets.
-Version: 0.1
-Author: Daniel Schmolze <saps@schmolze.com>
+Version: 0.99.6
+biocViews: BiomedicalInformatics, GeneExpression, GeneSetEnrichment,
+    DifferentialExpression, Survival
+Authors@R: c(
+    person("Daniel", "Schmolze",
+    email = "saps@schmolze.com", role = c("aut", "cre")),
+    person("Andrew", "Beck",
+    email = "abeck2@bidmc.harvard.edu", role = "aut"),
+    person("Benjamin", "Haibe-Kains",
+    email = "benjamin.haibe.kains@utoronto.ca", role = "aut"))
 Maintainer: Daniel Schmolze <saps@schmolze.com>
 Depends:
-    R (>= 2.14.0)
+    R (>= 2.14.0),
+    survival
 Imports:
     piano,
-    survival,
     survcomp,
     reshape2
 Suggests:

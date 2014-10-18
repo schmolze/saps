@@ -93,34 +93,38 @@ NULL
 #'     generated during the computation of saps_qvalue.}
 #' \item{direction}{Direction (-1 or 1) of the enrichment association for this geneset.}
 #' @examples
-#' # 50 patients, none lost to followup
-#' followup <- rep(1, 50)
+#' # 25 patients, none lost to followup
+#' followup <- rep(1, 25)
 #'
 #' # first 5 patients have good survival (in days)
-#' time <- c(20, 23, 25, 24, 27, sample(1:5, 45, TRUE))
-#' time <- time*365
+#' time <- c(25, 27, 24, 21, 26, sample(1:3, 20, TRUE))*365
 #'
-#' # create data for 1000 genes, 50 patients
-#' dat <- matrix(rnorm(50*1000), nrow=50, ncol=1000)
-#' colnames(dat) <- as.character(1:1000)
+#' # create data for 100 genes, 25 patients
+#' dat <- matrix(rnorm(25*100), nrow=25, ncol=100)
+#' colnames(dat) <- as.character(1:100)
 #'
-#' # create three genesets, first with specified genes,
-#' # others with randomly selected genes
-#' set1 <- c("10", "41", "11", "42", "50")
+#' # create two random genesets of 5 genes each
+#' set1 <- sample(colnames(dat), 5)
 #' set2 <- sample(colnames(dat), 5)
-#' set3 <- sample(colnames(dat), 5)
 #'
-#' genesets <- rbind(set1, set2, set3)
+#' genesets <- rbind(set1, set2)
+#'
+#' # compute saps
+#' results <- saps(genesets, dat, time, followup, random.samples=100)
+#'
+#' # check results
+#' saps_table <- results$saps_table
+#' saps_table[1:7]
 #'
 #' # increase expression levels for set1 for first 5 patients
 #' dat[1:5, set1] <- dat[1:5, set1]+10
 #'
-#' # compute saps statistics
-#' results <- saps(genesets, dat, time, followup)
+#' # run again, should get significant values for set1
+#' results <- saps(genesets, dat, time, followup, random.samples=100)
 #'
-#' # view results
+#' # check results
 #' saps_table <- results$saps_table
-#' saps_table
+#' saps_table[1:7]
 #' @seealso \code{\link[survival]{survdiff}} \code{\link[survcomp]{concordance.index}}
 #'     \code{\link[piano]{runGSA}}
 #' @references Beck AH, Knoblauch NW, Hefti MM, Kaplan J, Schnitt SJ, et al.
@@ -130,7 +134,10 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
                  followup, random.samples=1000, cpus=1, gsea.perm=1000,
                  compute_qvalue=FALSE, qvalue.samples=1000, verbose=TRUE) {
 
-  if ((cpus > 1) & (!is.installed("snowfall")))
+  if (!nrow(candidateGeneSets) > 0L)
+    stop("At least one cadidate gene set must be specified.")
+
+  if ((cpus > 1) && (!is.installed("snowfall")))
     stop("'snowfall' package not found (required for multiple CPU support)")
 
   candidateSetCount <- nrow(candidateGeneSets)
@@ -199,14 +206,14 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
 
     if(candidateSetSize == 0) {
 
-      warning(c("No gene data found for gene set ", setName, ", cannot compute SAPS."))
+      warning("No gene data found for gene set ", setName, ", cannot compute SAPS.")
 
     }
     else {
 
       if (verbose) {
-        message(c("Using gene set ", setName, ", size = ", candidateSetSize))
-        message(c("gene set #", i, " of ", candidateSetCount))
+        message("Using gene set ", setName, ", size = ", candidateSetSize)
+        message("gene set #", i, " of ", candidateSetCount)
       }
 
       scaledData <- scale(dataSet[, commonGenes])
@@ -378,12 +385,14 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
     message("done.")
 
 
-  return(results)
+  results
 
 }
 
 
 #' @export
+#' @import reshape2
+#' @import piano
 #' @title Compute P_enrichment
 #' @description This function performs a pre-ranked gene set enrichment
 #' analysis (GSEA) to evaluate the degree to which a candidate gene set is
@@ -406,20 +415,21 @@ saps <- function(candidateGeneSets, dataSet, survivalTimes,
 #'  \item{direction}{either 1 or -1 depending on the direction of association}
 #'
 #' @examples
-#' # create followup and survival vectors
-#' followup <- rep(1, 50)
-#' time <- c(20, 23, 25, 24, 27, sample(1:5, 45, TRUE))*365
+#' # 25 patients, none lost to followup
+#' followup <- rep(1, 25)
 #'
-#' # create fake gene data (50 patients, 1000 genes)
-#' dat <- matrix(rnorm(50*1000), nrow=50, ncol=1000)
-#' colnames(dat) <- as.character(1:1000)
+#' # first 5 patients have good survival (in days)
+#' time <- c(25, 27, 24, 21, 26, sample(1:3, 20, TRUE))*365
 #'
-#' # create genesets
-#' set1 <- c("10", "41", "11", "42", "50")
+#' # create data for 100 genes, 25 patients
+#' dat <- matrix(rnorm(25*100), nrow=25, ncol=100)
+#' colnames(dat) <- as.character(1:100)
+#'
+#' # create two random genesets of 5 genes each
+#' set1 <- sample(colnames(dat), 5)
 #' set2 <- sample(colnames(dat), 5)
-#' set3 <- sample(colnames(dat), 5)
 #'
-#' genesets <- rbind(set1, set2, set3)
+#' genesets <- rbind(set1, set2)
 #'
 #' # tweak data for first 5 patients for set1
 #' dat[1:5, set1] <- dat[1:5, set1]+10
@@ -446,7 +456,8 @@ calculatePEnrichment <- function(rankedGenes, candidateGeneSet,
                                  cpus, gsea.perm=1000) {
 
   # reshape candidate gene set into long form for piano input
-  candidateSetLong <- (reshape2::melt(as.matrix(candidateGeneSet), na.rm=TRUE))[, c("value", "Var1")]
+  candidateSetLong <- (reshape2::melt(as.matrix(candidateGeneSet),
+                                      na.rm=TRUE))[, c("value", "Var1")]
 
   gsc <- piano::loadGSC(candidateSetLong, type="data.frame")
 
@@ -484,12 +495,13 @@ calculatePEnrichment <- function(rankedGenes, candidateGeneSet,
   rownames(results) <- results$Row.names
   results <- results[, -1]
 
-  return(results)
+  results
 
 }
 
 
 #' @export
+#' @import survival
 #' @title Compute P_pure
 #' @description This function stratifies patients into two groups via k-means
 #' clustering (k=2) on an \emph{nxp} matrix consisting of \emph{n} patients
@@ -508,18 +520,18 @@ calculatePEnrichment <- function(rankedGenes, candidateGeneSet,
 #' \item{cluster}{Vector of assigned cluster (1 or 2) for each patient using the
 #'     supplied candidate prognostic geneset.}
 #' @examples
-#' # create followup and survival vectors
-#' followup <- rep(1, 50)
-#' time <- c(20, 23, 25, 24, 27, sample(1:5, 45, TRUE))*365
+#' # 25 patients, none lost to followup
+#' followup <- rep(1, 25)
 #'
-#' # create fake gene data (50 patients, 1000 genes)
-#' dat <- matrix(rnorm(50*1000), nrow=50, ncol=1000)
-#' colnames(dat) <- as.character(1:1000)
+#' # first 5 patients have good survival (in days)
+#' time <- c(25, 27, 24, 21, 26, sample(1:3, 20, TRUE))*365
 #'
-#' # create genesets
-#' set1 <- c("10", "41", "11", "42", "50")
-#' set2 <- sample(colnames(dat), 5)
-#' set3 <- sample(colnames(dat), 5)
+#' # create data for 100 genes, 25 patients
+#' dat <- matrix(rnorm(25*100), nrow=25, ncol=100)
+#' colnames(dat) <- as.character(1:100)
+#'
+#' # create random genesets of 5 genes
+#' set1 <- sample(colnames(dat), 5)
 #'
 #' # get gene data for set1
 #' set1_data <- dat[, set1]
@@ -546,11 +558,11 @@ calculatePPure <- function(geneData, survivalTimes, followup) {
   cluster <- kmeans(geneData, 2)$cluster
 
   # compute probability of no survival difference
-  survtest <- survival::survdiff(survival::Surv(survivalTimes, followup) ~ cluster)
+  survtest <- survival::survdiff(Surv(survivalTimes, followup) ~ cluster)
 
   p_pure <- 1 - pchisq(survtest$chisq, 1)
 
-  return(list("p_pure"=p_pure, "cluster"=cluster))
+  list("p_pure"=p_pure, "cluster"=cluster)
 
 }
 
@@ -580,18 +592,20 @@ calculatePPure <- function(geneData, survivalTimes, followup) {
 #' \item{p_pures}{A vector of calculated p_pure values for each randomly
 #'     generated geneset.}
 #' @examples
-#' # create followup and survival vectors
-#' followup <- rep(1, 50)
-#' time <- c(20, 23, 25, 24, 27, sample(1:5, 45, TRUE))*365
+#' # 25 patients, none lost to followup
+#' followup <- rep(1, 25)
 #'
-#' # create fake gene data (50 patients, 1000 genes)
-#' dat <- matrix(rnorm(50*1000), nrow=50, ncol=1000)
-#' colnames(dat) <- as.character(1:1000)
+#' # first 5 patients have good survival (in days)
+#' time <- c(25, 27, 24, 21, 26, sample(1:3, 20, TRUE))*365
+#'
+#' # create data for 100 genes, 25 patients
+#' dat <- matrix(rnorm(25*100), nrow=25, ncol=100)
+#' colnames(dat) <- as.character(1:100)
 #'
 #' # relatively low threshold
 #' p_pure <- 0.05
 #'
-#' p_random <- calculatePRandom(dat, 5, p_pure, time, followup)
+#' p_random <- calculatePRandom(dat, 5, p_pure, time, followup, random.samples=100)
 #' p_random$p_random
 #' hist(p_random$p_pures)
 #' length(p_random$p_pures[p_random$p_pures <= p_pure])
@@ -599,7 +613,7 @@ calculatePPure <- function(geneData, survivalTimes, followup) {
 #' # set a more stringent threshold
 #' p_pure <- 0.001
 #'
-#' p_random <- calculatePRandom(dat, 5, p_pure, time, followup)
+#' p_random <- calculatePRandom(dat, 5, p_pure, time, followup, random.samples=100)
 #' length(p_random$p_pures[p_random$p_pures <= p_pure])
 #' @seealso \code{\link{saps}}
 #' @references Beck AH, Knoblauch NW, Hefti MM, Kaplan J, Schnitt SJ, et al.
@@ -618,7 +632,7 @@ calculatePRandom <- function(dataSet, sampleSize, p_pure, survivalTimes, followu
 
     randomGeneSet <- scale(dataSet[, randomGeneNames])
 
-    return(calculatePPure(randomGeneSet, survivalTimes, followup)[["p_pure"]])
+    calculatePPure(randomGeneSet, survivalTimes, followup)[["p_pure"]]
 
   }
 
@@ -629,7 +643,7 @@ calculatePRandom <- function(dataSet, sampleSize, p_pure, survivalTimes, followu
   # as the p_pure for the candidate geneset
   p_random <- sum(p_pures <= p_pure)/random.samples
 
-  return (list("p_random"=p_random, "p_pures"=p_pures))
+  list("p_random"=p_random, "p_pures"=p_pures)
 
 }
 
@@ -671,28 +685,28 @@ calculatePRandom <- function(dataSet, sampleSize, p_pure, survivalTimes, followu
 #' \item{random_saps_scores}{a vector of individual saps scores for each
 #' randomly generated geneset.}
 #' @examples
-#' # create followup and survival vectors
-#' followup <- rep(1, 50)
-#' time <- c(20, 23, 25, 24, 27, sample(1:5, 45, TRUE))*365
+#' # 25 patients, none lost to followup
+#' followup <- rep(1, 25)
 #'
-#' # create fake gene data (50 patients, 1000 genes)
-#' dat <- matrix(rnorm(50*1000), nrow=50, ncol=1000)
-#' colnames(dat) <- as.character(1:1000)
+#' # first 5 patients have good survival (in days)
+#' time <- c(25, 27, 24, 21, 26, sample(1:3, 20, TRUE))*365
+#'
+#' # create data for 100 genes, 25 patients
+#' dat <- matrix(rnorm(25*100), nrow=25, ncol=100)
+#' colnames(dat) <- as.character(1:100)
 #'
 #' # borderline significant saps score
 #' saps_score <- 1.3
+#'
 #' rankedGenes <- rankConcordance(dat, time, followup)[,"z"]
 #'
-#' # go get some coffee...
-#' \dontrun{
-#' q_value <- calculateQValue(dat, 5, time, followup, saps_score, random.samples=1000,
-#'      qvalue.samples=100, cpus=4, gsea.perm=1000, rankedGenes)
+#' q_value <- calculateQValue(dat, 5, time, followup, saps_score, random.samples=100,
+#'      qvalue.samples=10, cpus=1, gsea.perm=1000, rankedGenes)
 #'
 #' q_value$q_value
 #' random_scores <- abs(q_value$random_saps_scores)
 #' hist(random_scores)
 #' length(random_scores[random_scores > saps_score])
-#' }
 #' @seealso \code{\link{saps}}
 #' @references Beck AH, Knoblauch NW, Hefti MM, Kaplan J, Schnitt SJ, et al.
 #' (2013) Significance Analysis of Prognostic Signatures. PLoS Comput Biol 9(1):
@@ -736,7 +750,7 @@ calculateQValue <- function(dataSet, sampleSize, survivalTimes, followup,
 
     random_saps_score <- -log10(max(p_pure, p_random, p_enrich)) * direction
 
-    return(random_saps_score)
+    random_saps_score
 
   }
 
@@ -748,13 +762,14 @@ calculateQValue <- function(dataSet, sampleSize, survivalTimes, followup,
   # as the saps score for the candidate geneset
   q_value <- sum(abs(saps_scores) >= abs(saps_score))/qvalue.samples
 
-  return(list("q_value"=q_value, "random_saps_scores"=saps_scores))
+  list("q_value"=q_value, "random_saps_scores"=saps_scores)
 
 }
 
 
 
 #' @export
+#' @import survcomp
 #' @title Compute concordance indices
 #' @description Computes concordance indices for a gene expression data set,
 #' and returns the concordance index and the z-score.
@@ -777,13 +792,15 @@ calculateQValue <- function(dataSet, sampleSize, survivalTimes, followup,
 #'
 #' and as many rows as \code{dataset}. The row names contain the gene identifiers.
 #' @examples
-#' # create followup and survival vectors
-#' followup <- rep(1, 50)
-#' time <- c(20, 23, 25, 24, 27, sample(1:5, 45, TRUE))*365
+#' # 25 patients, none lost to followup
+#' followup <- rep(1, 25)
 #'
-#' # create fake gene data (50 patients, 1000 genes)
-#' dat <- matrix(rnorm(50*1000), nrow=50, ncol=1000)
-#' colnames(dat) <- as.character(1:1000)
+#' # first 5 patients have good survival (in days)
+#' time <- c(25, 27, 24, 21, 26, sample(1:3, 20, TRUE))*365
+#'
+#' # create data for 100 genes, 25 patients
+#' dat <- matrix(rnorm(25*100), nrow=25, ncol=100)
+#' colnames(dat) <- as.character(1:100)
 #'
 #' ci <- rankConcordance(dat, time, followup)
 #' z <- ci[,"z"]
@@ -797,17 +814,17 @@ rankConcordance <- function(dataset, survivalTimes, followup) {
     tt <- survcomp::concordance.index(x, surv.time=survivalTimes,
                   surv.event=followup, method="noether", na.rm=TRUE)
 
-    return (c("cindex"=tt$c.index, "z"=(tt$c.index - 0.5)/tt$se))
+    c("cindex"=tt$c.index, "z"=(tt$c.index - 0.5)/tt$se)
 
   }
 
-  return (t(apply(dataset, 2, concordance_f)))
+  t(apply(dataset, 2, concordance_f))
 
 }
 
 
 is.installed <- function(pkg) {
-  return (is.element(pkg, installed.packages()[,1]))
+  is.element(pkg, installed.packages()[,1])
 }
 
 
@@ -844,6 +861,6 @@ save_saps <- function(geneSet, saps_unadj, saps_adj) {
   geneSet$saps_adjusted["saps_score"] <- saps_score_adj
   geneSet$saps_adjusted["saps_qvalue"] <- saps_qvalue_adj
 
-  return(geneSet)
+  geneSet
 
 }

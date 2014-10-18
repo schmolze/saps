@@ -1,4 +1,6 @@
 #' @export
+#' @import survcomp
+#' @import survival
 #' @title Plot Kaplan-Meier curves for a gene set
 #' @description Plots Kaplan-Meier survival curves for a given gene set using the
 #'     cluster labels generated during the computation of \code{p_pure} to
@@ -16,6 +18,43 @@
 #' @param p.text Text to display in the lower left hand corner. Defaults to
 #'     displaying \code{p_pure} and \code{p_pure_adj}.
 #' @param ... Additional arguments to be passed to \code{\link[survcomp]{km.coxph.plot}}
+#' @return The function is used for side-effects (drawwing a plot). No value is
+#' returned.
+#' @examples
+#' # 25 patients, none lost to followup
+#' followup <- rep(1, 25)
+#'
+#' # first 5 patients have good survival (in days)
+#' time <- c(25, 27, 24, 21, 26, sample(1:3, 20, TRUE))*365
+#'
+#' # create data for 100 genes, 25 patients
+#' dat <- matrix(rnorm(25*100), nrow=25, ncol=100)
+#' colnames(dat) <- as.character(1:100)
+#'
+#' # create two random genesets of 5 genes each
+#' set1 <- sample(colnames(dat), 5)
+#' set2 <- sample(colnames(dat), 5)
+#'
+#' genesets <- rbind(set1, set2)
+#'
+#' # run saps
+#' results <- saps(genesets, dat, time, followup, random.samples=100)
+#'
+#' set <- results$genesets[["set1"]]
+#'
+#' # KM plots should not seperate at this point
+#' plotKM(set, time/365, followup, x.label="Overall survival (years)")
+#'
+#' # increase expression levels for set1 for first 5 patients
+#' dat[1:5, set1] <- dat[1:5, set1]+10
+#'
+#' # run saps again
+#' results <- saps(genesets, dat, time, followup, random.samples=100)
+#'
+#' set <- results$genesets[["set1"]]
+#'
+#' # KM plots should now seperate
+#' plotKM(set, time/365, followup, x.label="Overall survival (years)")
 #' @seealso \code{\link{saps}} \code{\link{calculatePPure}}
 #'     \code{\link[survcomp]{km.coxph.plot}}
 plotKM <- function(geneset, survivalTimes, followup, title=NA, y.label=NA,
@@ -38,16 +77,15 @@ plotKM <- function(geneset, survivalTimes, followup, title=NA, y.label=NA,
 
   dd <- data.frame("time"=survivalTimes, "event"=followup, "cluster"=cluster)
 
-  text <- paste("p_pure = ", round(p_pure, digits=3), ", p_pure_adj = ",
-                round(p_pure_adj, digits=3))
+  text <- paste("p_pure = ", round(p_pure, digits=6), ", p_pure_adj = ",
+                round(p_pure_adj, digits=6))
 
-  survcomp::km.coxph.plot(formula.s = Surv(survivalTimes, followup) ~ cluster,
-                data.s = dd,
-                main.title=title,
-                y.label=y.label,
-                x.label=x.label,
-                o.text=text,
-                ...)
+  survcomp::km.coxph.plot(
+    formula.s = survival::Surv(survivalTimes, followup) ~ cluster,
+    data.s = dd, main.title=title, y.label=y.label, x.label=x.label,
+    o.text=text, ...)
+
+  invisible(NULL)
 
 }
 
@@ -61,6 +99,43 @@ plotKM <- function(geneset, survivalTimes, followup, title=NA, y.label=NA,
 #'     for the gene set is displayed as well.
 #' @param geneset A geneset as returned by \code{\link{saps}}.
 #' @param ... Additional arguments to be passed to \code{\link{plot}}
+#' @return The function is used for side-effects (drawwing a plot). No value is
+#' returned.
+#' @examples
+#' # 25 patients, none lost to followup
+#' followup <- rep(1, 25)
+#'
+#' # first 5 patients have good survival (in days)
+#' time <- c(25, 27, 24, 21, 26, sample(1:3, 20, TRUE))*365
+#'
+#' # create data for 100 genes, 25 patients
+#' dat <- matrix(rnorm(25*100), nrow=25, ncol=100)
+#' colnames(dat) <- as.character(1:100)
+#'
+#' # create two random genesets of 5 genes each
+#' set1 <- sample(colnames(dat), 5)
+#' set2 <- sample(colnames(dat), 5)
+#'
+#' genesets <- rbind(set1, set2)
+#'
+#' # run saps
+#' results <- saps(genesets, dat, time, followup, random.samples=100)
+#'
+#' set <- results$genesets[["set1"]]
+#'
+#' # should not be significant
+#' plotRandomDensity(set)
+#'
+#' # increase expression levels for set1 for first 5 patients
+#' dat[1:5, set1] <- dat[1:5, set1]+10
+#'
+#' # run saps again
+#' results <- saps(genesets, dat, time, followup, random.samples=100)
+#'
+#' set <- results$genesets[["set1"]]
+#'
+#' # now it should be significant
+#' plotRandomDensity(set)
 #' @seealso \code{\link{saps}} \code{\link{calculatePRandom}}
 plotRandomDensity <- function(geneset,  ...) {
 
@@ -74,7 +149,7 @@ plotRandomDensity <- function(geneset,  ...) {
 
   title <- paste("Significance of p_pure for ", name, "vs. random gene sets")
 
-  plot(d, main=title, xlab="-log10 p_pure of random gene sets", cex=0.85)
+  plot(d, main=title, xlab="-log10 p_pure of random gene sets", cex=0.85, ...)
 
   polygon(d, col=rgb(1, 0, 0, 0.5))
 
@@ -85,9 +160,12 @@ plotRandomDensity <- function(geneset,  ...) {
 
   legend <- paste("-log 10 p_pure > ", sum(random_p_pures > p_pure), " of ",
                   length(random_p_pures), " random gene sets   \n (p_random = ",
-                  p_random, ", p_random_adj = ", p_random_adj, ")   ", sep="")
+                  round(p_random, digits=5), ", p_random_adj = ",
+                  round(p_random_adj, digits=5), ")   ", sep="")
 
   mtext(legend, side=3, line=-2.5, adj=1)
+
+  invisible(NULL)
 
 }
 
@@ -100,6 +178,36 @@ plotRandomDensity <- function(geneset,  ...) {
 #'     \code{saps_score} for the gene set indicated.
 #' @param geneset A geneset as returned by \code{\link{saps}}.
 #' @param ... Additional arguments to be passed to \code{\link{plot}}
+#' @return The function is used for side-effects (drawwing a plot). No value is
+#' returned.
+#' @examples
+#' # 25 patients, none lost to followup
+#' followup <- rep(1, 25)
+#'
+#' # first 5 patients have good survival (in days)
+#' time <- c(25, 27, 24, 21, 26, sample(1:3, 20, TRUE))*365
+#'
+#' # create data for 100 genes, 25 patients
+#' dat <- matrix(rnorm(25*100), nrow=25, ncol=100)
+#' colnames(dat) <- as.character(1:100)
+#'
+#' # create two random genesets of 5 genes each
+#' set1 <- sample(colnames(dat), 5)
+#' set2 <- sample(colnames(dat), 5)
+#'
+#' genesets <- rbind(set1, set2)
+#'
+#' # increase expression levels for set1 for first 5 patients
+#' dat[1:5, set1] <- dat[1:5, set1]+10
+#'
+#' # run saps and compute q-values
+#' results <- saps(genesets, dat, time, followup, random.samples=100,
+#'                compute_qvalue=TRUE, qvalue.samples=10)
+#'
+#' set <- results$genesets[["set1"]]
+#'
+#' # qvalue.samples=10 is too small to achieve significance
+#' plotSapsScoreDensity(set)
 #' @seealso \code{\link{saps}} \code{\link{calculateQValue}}
 plotSapsScoreDensity <- function(geneset,  ...) {
 
@@ -113,7 +221,8 @@ plotSapsScoreDensity <- function(geneset,  ...) {
 
   title <- paste("Significance of saps score for ", name, "vs. random gene sets")
 
-  plot(d, main=title, xlab="-log10 saps score of random gene sets", cex=0.85)
+  plot(d, main=title, xlab="-log10 saps score of random gene sets",
+       cex=0.85, ...)
 
   polygon(d, col=rgb(1, 0, 0, 0.5))
 
@@ -130,6 +239,8 @@ plotSapsScoreDensity <- function(geneset,  ...) {
 
   mtext(legend, side=3, line=-2.5, adj=1)
 
+  invisible(NULL)
+
 }
 
 
@@ -141,6 +252,43 @@ plotSapsScoreDensity <- function(geneset,  ...) {
 #' @param geneset A geneset as returned by \code{\link{saps}}.
 #' @param rankedGenes A vector of concordance index z-scores. Usually this
 #'     will be the \code{rankedGenes} element returned by \code{\link{saps}}.
+#' @return The function is used for side-effects (drawwing a plot). No value is
+#' returned.
+#' @examples
+#' # 25 patients, none lost to followup
+#' followup <- rep(1, 25)
+#'
+#' # first 5 patients have good survival (in days)
+#' time <- c(25, 27, 24, 21, 26, sample(1:3, 20, TRUE))*365
+#'
+#' # create data for 100 genes, 25 patients
+#' dat <- matrix(rnorm(25*100), nrow=25, ncol=100)
+#' colnames(dat) <- as.character(1:100)
+#'
+#' # create two random genesets of 5 genes each
+#' set1 <- sample(colnames(dat), 5)
+#' set2 <- sample(colnames(dat), 5)
+#'
+#' genesets <- rbind(set1, set2)
+#'
+#' # run saps
+#' results <- saps(genesets, dat, time, followup, random.samples=100)
+#'
+#' set <- results$genesets[["set1"]]
+#'
+#' # p_enrich should not be significant
+#' plotEnrichment(set, results$rankedGenes)
+#'
+#' # increase expression levels for set1 for first 5 patients
+#' dat[1:5, set1] <- dat[1:5, set1]+10
+#'
+#' # run saps again
+#' results <- saps(genesets, dat, time, followup, random.samples=100)
+#'
+#' set <- results$genesets[["set1"]]
+#'
+#' # now it should be significant
+#' plotEnrichment(set, results$rankedGenes)
 #' @seealso \code{\link{saps}} \code{\link{rankConcordance}}
 plotEnrichment <- function(geneset, rankedGenes) {
 
@@ -170,5 +318,6 @@ plotEnrichment <- function(geneset, rankedGenes) {
 
   mtext(text, side=1, line=-2, adj=0)
 
+  invisible(NULL)
 
 }

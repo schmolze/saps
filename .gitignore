@@ -4,5 +4,5 @@
 .Rbuildignore
 
 *.Rd
-
 vignettes/saps_cache
+inst/doc
