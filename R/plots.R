@@ -18,7 +18,7 @@
 #' @param p.text Text to display in the lower left hand corner. Defaults to
 #'     displaying \code{p_pure} and \code{p_pure_adj}.
 #' @param ... Additional arguments to be passed to \code{\link[survcomp]{km.coxph.plot}}
-#' @return The function is used for side-effects (drawwing a plot). No value is
+#' @return The function is used for side-effects (drawing a plot). No value is
 #' returned.
 #' @examples
 #' # 25 patients, none lost to followup
@@ -99,7 +99,7 @@ plotKM <- function(geneset, survivalTimes, followup, title=NA, y.label=NA,
 #'     for the gene set is displayed as well.
 #' @param geneset A geneset as returned by \code{\link{saps}}.
 #' @param ... Additional arguments to be passed to \code{\link{plot}}
-#' @return The function is used for side-effects (drawwing a plot). No value is
+#' @return The function is used for side-effects (drawing a plot). No value is
 #' returned.
 #' @examples
 #' # 25 patients, none lost to followup
@@ -178,7 +178,7 @@ plotRandomDensity <- function(geneset,  ...) {
 #'     \code{saps_score} for the gene set indicated.
 #' @param geneset A geneset as returned by \code{\link{saps}}.
 #' @param ... Additional arguments to be passed to \code{\link{plot}}
-#' @return The function is used for side-effects (drawwing a plot). No value is
+#' @return The function is used for side-effects (drawing a plot). No value is
 #' returned.
 #' @examples
 #' # 25 patients, none lost to followup
@@ -252,7 +252,7 @@ plotSapsScoreDensity <- function(geneset,  ...) {
 #' @param geneset A geneset as returned by \code{\link{saps}}.
 #' @param rankedGenes A vector of concordance index z-scores. Usually this
 #'     will be the \code{rankedGenes} element returned by \code{\link{saps}}.
-#' @return The function is used for side-effects (drawwing a plot). No value is
+#' @return The function is used for side-effects (drawing a plot). No value is
 #' returned.
 #' @examples
 #' # 25 patients, none lost to followup

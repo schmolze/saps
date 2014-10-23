@@ -15,7 +15,7 @@ Description: Functions implementing the Significance Analysis of Prognostic
     significance. A SAPS_score is calculated to summarize the three statistics,
     and optionally a Q-value is computed to estimate the significance of the
     SAPS_score by calculating SAPS_scores for random gene sets.
-Version: 0.99.6
+Version: 0.99.7
 biocViews: BiomedicalInformatics, GeneExpression, GeneSetEnrichment,
     DifferentialExpression, Survival
 Authors@R: c(
