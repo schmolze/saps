@@ -463,7 +463,7 @@ calculatePEnrichment <- function(rankedGenes, candidateGeneSet,
 
   # run GSEA using piano package
   gsa <- piano::runGSA(rankedGenes, geneSetStat="gsea", signifMethod="geneSampling",
-                adjMethod="fdr", gsc=gsc, gsSizeLim=c(1, 250), nPerm=gsea.perm,
+                adjMethod="none", gsc=gsc, gsSizeLim=c(1, 250), nPerm=gsea.perm,
                 ncpus=cpus, verbose=FALSE)
 
   # get p-values for up and down-regulated gene sets
